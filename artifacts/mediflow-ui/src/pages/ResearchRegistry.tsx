@@ -8,6 +8,8 @@ import {
   CONTRACTS_DEPLOYED,
 } from "@/lib/contracts";
 import { TransactionToast, FheCountdown, type TxStatus } from "@/components/TransactionToast";
+import { TxHistoryPanel } from "@/components/TxHistoryPanel";
+import { useTxHistory } from "@/hooks/useTxHistory";
 import { Button } from "@/components/ui/button";
 import { FlaskConical, Users, CheckCircle, Loader2, AlertTriangle, Info } from "lucide-react";
 
@@ -77,6 +79,7 @@ type ComputeStep = "idle" | "querying" | "computing" | "done";
 
 export default function ResearchRegistry() {
   const { address, isConnected } = useAccount();
+  const { entries, addEntry, clearHistory } = useTxHistory();
 
   const [cohort, setCohort] = useState<CohortId>("A");
   const [queryType, setQueryType] = useState<"high-risk" | "diabetes">("high-risk");
@@ -97,9 +100,15 @@ export default function ResearchRegistry() {
   const { isSuccess: cohortSuccess } = useWaitForTransactionReceipt({ hash: cohortHash });
 
   useEffect(() => {
-    if (cohortSuccess) setRegisterTxStatus("success");
-    if (cohortError) setRegisterTxStatus("error");
-  }, [cohortSuccess, cohortError]);
+    if (cohortSuccess) {
+      setRegisterTxStatus("success");
+      addEntry("Register Cohort", "success", cohortHash);
+    }
+    if (cohortError) {
+      setRegisterTxStatus("error");
+      addEntry("Register Cohort", "error");
+    }
+  }, [cohortSuccess, cohortError, cohortHash, addEntry]);
 
   const handleRunQuery = () => {
     setComputeStep("querying");
@@ -470,6 +479,9 @@ export default function ResearchRegistry() {
             )}
           </Button>
         </div>
+
+        {/* Fix 3 — Transaction History */}
+        <TxHistoryPanel entries={entries} onClear={clearHistory} />
       </div>
     </div>
   );

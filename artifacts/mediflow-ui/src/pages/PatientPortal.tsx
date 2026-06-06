@@ -19,6 +19,8 @@ import {
   CONTRACTS_DEPLOYED,
 } from "@/lib/contracts";
 import { TransactionToast, type TxStatus } from "@/components/TransactionToast";
+import { TxHistoryPanel } from "@/components/TxHistoryPanel";
+import { useTxHistory } from "@/hooks/useTxHistory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -66,6 +68,7 @@ export default function PatientPortal() {
   const isSepolia = chainId === sepolia.id;
   const relayerStatus = useRelayerStatus();
   const fheReady = isConnected && isSepolia;
+  const { entries, addEntry, clearHistory } = useTxHistory();
 
   const encrypt = useEncrypt();
 
@@ -133,15 +136,17 @@ export default function PatientPortal() {
     if (registerSuccess) {
       setTxStatus("success");
       void refetchEnrolled();
+      addEntry("Register Patient", "success", registerHash);
     }
-  }, [registerSuccess, refetchEnrolled]);
+  }, [registerSuccess, refetchEnrolled, registerHash, addEntry]);
 
   useEffect(() => {
     if (registerError && txStatus !== "idle") {
       setTxStatus("error");
       setTxError(registerError.message.slice(0, 200));
+      addEntry("Register Patient", "error");
     }
-  }, [registerError, txStatus]);
+  }, [registerError, txStatus, addEntry]);
 
   const [lastGrantAddr, setLastGrantAddr] = useState("");
   useEffect(() => {
@@ -150,10 +155,11 @@ export default function PatientPortal() {
         ...p,
         { address: lastGrantAddr, grantedAt: new Date().toLocaleDateString() },
       ]);
+      addEntry("Authorize Provider", "success", grantHash);
       setLastGrantAddr("");
       setProviderInput("");
     }
-  }, [grantSuccess, lastGrantAddr]);
+  }, [grantSuccess, lastGrantAddr, grantHash, addEntry]);
 
   useEffect(() => {
     if (delegateSuccess && lastDelegateAddr) {
@@ -165,11 +171,12 @@ export default function PatientPortal() {
           grantedAt: new Date().toLocaleDateString(),
         },
       ]);
+      addEntry("Grant Delegated Field Access", "success", delegateHash);
       setLastDelegateAddr("");
       setLastDelegateField("");
       setDelegateAddr("");
     }
-  }, [delegateSuccess, lastDelegateAddr, lastDelegateField]);
+  }, [delegateSuccess, lastDelegateAddr, lastDelegateField, delegateHash, addEntry]);
 
   const handleEncryptAndStore = async () => {
     if (!address) return;
@@ -747,6 +754,9 @@ export default function PatientPortal() {
             )}
           </div>
         </section>
+
+        {/* Fix 3 — Transaction History */}
+        <TxHistoryPanel entries={entries} onClear={clearHistory} />
       </div>
     </div>
   );

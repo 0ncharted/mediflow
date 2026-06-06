@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useAccount,
   useReadContract,
@@ -12,6 +12,8 @@ import {
   INSURANCE_MODULE_ABI,
   CONTRACTS_DEPLOYED,
 } from "@/lib/contracts";
+import { TxHistoryPanel } from "@/components/TxHistoryPanel";
+import { useTxHistory } from "@/hooks/useTxHistory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,14 +24,18 @@ import {
   AlertTriangle,
   Shield,
   DollarSign,
+  Info,
 } from "lucide-react";
 
 const NULL_ADDR = "0x0000000000000000000000000000000000000000" as const;
 const NULL_BYTES32 =
   "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
 
+const CHECK_ID_REGEX = /^0x[0-9a-fA-F]{64}$/;
+
 export default function InsuranceModule() {
   const { isConnected } = useAccount();
+  const { entries, addEntry, clearHistory } = useTxHistory();
 
   const [policyPatient, setPolicyPatient] = useState("");
   const [premium, setPremium] = useState("0.01");
@@ -59,6 +65,24 @@ export default function InsuranceModule() {
   const { isLoading: claimConfirming, isSuccess: claimSuccess } =
     useWaitForTransactionReceipt({ hash: claimHash });
 
+  useEffect(() => {
+    if (policySuccess && policyHash) {
+      addEntry("Create Insurance Policy", "success", policyHash);
+    }
+    if (policyError) {
+      addEntry("Create Insurance Policy", "error");
+    }
+  }, [policySuccess, policyHash, policyError, addEntry]);
+
+  useEffect(() => {
+    if (claimSuccess && claimHash) {
+      addEntry("Process Claim Payment", "success", claimHash);
+    }
+    if (claimError) {
+      addEntry("Process Claim Payment", "error");
+    }
+  }, [claimSuccess, claimHash, claimError, addEntry]);
+
   const queryViewAddr = (viewPatient.startsWith("0x") && viewPatient.length === 42
     ? viewPatient
     : NULL_ADDR) as `0x${string}`;
@@ -87,6 +111,12 @@ export default function InsuranceModule() {
     },
   });
 
+  const checkIdValid = CHECK_ID_REGEX.test(checkId);
+  const checkIdError =
+    checkId.length > 0 && !checkIdValid
+      ? "Must be a 66-character hex string (0x followed by 64 hex digits)"
+      : null;
+
   const handleCreatePolicy = () => {
     if (!policyPatient.startsWith("0x")) return;
     createPolicy({
@@ -103,7 +133,7 @@ export default function InsuranceModule() {
   };
 
   const handleProcessClaim = () => {
-    if (!claimPatient.startsWith("0x") || !checkId.startsWith("0x")) return;
+    if (!claimPatient.startsWith("0x") || !checkIdValid) return;
     processClaim({
       address: INSURANCE_MODULE_ADDRESS,
       abi: INSURANCE_MODULE_ABI,
@@ -161,8 +191,10 @@ export default function InsuranceModule() {
             </div>
             <p className="text-xs text-muted-foreground mb-5">
               Calls{" "}
-              <code className="font-mono bg-muted/50 px-1 rounded">createPolicy(patient, premium, coverage, riskThreshold)</code>.
-              Binds a patient address to an encrypted risk-gated policy.
+              <code className="font-mono bg-muted/50 px-1 rounded">
+                createPolicy(patient, premium, coverage, riskThreshold)
+              </code>
+              . Binds a patient address to an encrypted risk-gated policy.
             </p>
 
             <div className="space-y-3">
@@ -236,7 +268,13 @@ export default function InsuranceModule() {
 
             <Button
               onClick={handleCreatePolicy}
-              disabled={!isConnected || !policyPatient.startsWith("0x") || policyPending || policyConfirming || !CONTRACTS_DEPLOYED}
+              disabled={
+                !isConnected ||
+                !policyPatient.startsWith("0x") ||
+                policyPending ||
+                policyConfirming ||
+                !CONTRACTS_DEPLOYED
+              }
               className="mt-4 w-full gap-2"
             >
               {policyPending || policyConfirming ? (
@@ -254,8 +292,10 @@ export default function InsuranceModule() {
             </div>
             <p className="text-xs text-muted-foreground mb-5">
               Calls{" "}
-              <code className="font-mono bg-muted/50 px-1 rounded">processClaimPayment(patient, checkId)</code>.
-              Reads the encrypted eligibility result and triggers payment from{" "}
+              <code className="font-mono bg-muted/50 px-1 rounded">
+                processClaimPayment(patient, checkId)
+              </code>
+              . Reads the encrypted eligibility result and triggers payment from{" "}
               <code className="font-mono bg-muted/50 px-1 rounded">MockPaymentVault</code> if
               eligible.
             </p>
@@ -277,11 +317,25 @@ export default function InsuranceModule() {
                   Eligibility Check ID (bytes32)
                 </label>
                 <Input
-                  placeholder="0x…"
+                  placeholder="0x0000…0000 (66 hex characters)"
                   value={checkId}
                   onChange={(e) => setCheckId(e.target.value)}
-                  className="font-mono text-xs"
+                  className={`font-mono text-xs ${checkIdError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
+                {/* Fix 4 — helper text + validation */}
+                {checkIdError ? (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-destructive">
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    {checkIdError}
+                  </p>
+                ) : (
+                  <p className="mt-1.5 flex items-start gap-1 text-xs text-muted-foreground">
+                    <Info className="h-3 w-3 shrink-0 mt-0.5" />
+                    Paste the bytes32 Check ID from Provider Dashboard after running an
+                    eligibility check. It is automatically copied to your clipboard when a
+                    check completes.
+                  </p>
+                )}
               </div>
               {claimProcessed !== undefined && (
                 <div className="flex items-center gap-2 text-xs">
@@ -312,7 +366,7 @@ export default function InsuranceModule() {
               disabled={
                 !isConnected ||
                 !claimPatient.startsWith("0x") ||
-                !checkId.startsWith("0x") ||
+                !checkIdValid ||
                 claimPending ||
                 claimConfirming ||
                 !CONTRACTS_DEPLOYED
@@ -377,6 +431,9 @@ export default function InsuranceModule() {
             <p className="text-xs text-muted-foreground">No policy found for this address.</p>
           ) : null}
         </div>
+
+        {/* Fix 3 — Transaction History */}
+        <TxHistoryPanel entries={entries} onClear={clearHistory} />
       </div>
     </div>
   );

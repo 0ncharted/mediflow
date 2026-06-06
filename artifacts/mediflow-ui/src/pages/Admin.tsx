@@ -3,6 +3,8 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagm
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { RESEARCH_REGISTRY_ADDRESS, RESEARCH_REGISTRY_ABI, CONTRACTS_DEPLOYED } from "@/lib/contracts";
 import { TransactionToast, type TxStatus } from "@/components/TransactionToast";
+import { TxHistoryPanel } from "@/components/TxHistoryPanel";
+import { useTxHistory } from "@/hooks/useTxHistory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -42,6 +44,7 @@ interface TxLogEntry {
 
 export default function Admin() {
   const { address, isConnected } = useAccount();
+  const { entries, addEntry, clearHistory } = useTxHistory();
 
   const [instAddress, setInstAddress] = useState("");
   const [instName, setInstName] = useState("");
@@ -82,6 +85,7 @@ export default function Admin() {
         },
         ...prev,
       ]);
+      addEntry("Approve Institution", "success", approveHash);
       setInstAddress("");
       setInstName("");
       setInstPurpose("");
@@ -89,8 +93,9 @@ export default function Admin() {
     if (approveWriteError) {
       setApproveTxStatus("error");
       setApproveError(approveWriteError.message.slice(0, 200));
+      addEntry("Approve Institution", "error");
     }
-  }, [approveSuccess, approveHash, approveWriteError, instAddress, instName, instPurpose]);
+  }, [approveSuccess, approveHash, approveWriteError, instAddress, instName, instPurpose, addEntry]);
 
   const handleApprove = () => {
     if (!instAddress.startsWith("0x") || !instName.trim()) return;
@@ -317,6 +322,9 @@ export default function Admin() {
             </div>
           )}
         </div>
+
+        {/* Fix 3 — Transaction History */}
+        <TxHistoryPanel entries={entries} onClear={clearHistory} />
       </div>
     </div>
   );
