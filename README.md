@@ -1,6 +1,32 @@
 # MediFlow — Composable Confidential Health Records on Zama FHEVM
 
-> **⚠ All data in this project is mock/synthetic — no real patient records are stored, transmitted, or processed. This is a research demo of Zama FHEVM v0.11 on Sepolia testnet.**
+> **Live demo:** *pending Vercel token — see Step 6 below*
+>
+> **⚠ All data is mock/synthetic — no real patient records. Research demo on Sepolia testnet.**
+
+---
+
+## Testing — Get Sepolia ETH before interacting with any contract function
+
+Visit **[sepoliafaucet.com](https://sepoliafaucet.com)** to fund your wallet with Sepolia ETH before using any write function (register patient, run eligibility check, create policy, etc.).
+
+---
+
+## Deployed Contracts (Sepolia)
+
+Deployed 2026-06-06 · Deployer: `0x14A905eE9F79F871EaeEA20Aa932292BC472B435`
+
+| Contract | Address | Etherscan |
+|---|---|---|
+| PatientRegistry | `0x511C202C1b5Cf3dfDd23688F4050E36aD3737837` | [↗](https://sepolia.etherscan.io/address/0x511C202C1b5Cf3dfDd23688F4050E36aD3737837) |
+| HealthQueryEngine | `0xF29726623559de96BDBE89E64A53Bc63A78eec07` | [↗](https://sepolia.etherscan.io/address/0xF29726623559de96BDBE89E64A53Bc63A78eec07) |
+| InsuranceModule | `0x88cF8Abd11F3CAa0708398FaE9a2bFBc8b1460ED` | [↗](https://sepolia.etherscan.io/address/0x88cF8Abd11F3CAa0708398FaE9a2bFBc8b1460ED) |
+| ResearchRegistry | `0x0a720C544819f768101f568C812479cc65bf134e` | [↗](https://sepolia.etherscan.io/address/0x0a720C544819f768101f568C812479cc65bf134e) |
+| MockPaymentVault | `0xeD7F64Efc6B17ecebb2958FFD4E3580529560217` | [↗](https://sepolia.etherscan.io/address/0xeD7F64Efc6B17ecebb2958FFD4E3580529560217) |
+
+Deployment manifest: `mediflow-contracts/deployments/sepolia.json`
+
+---
 
 ## What is MediFlow?
 
@@ -16,21 +42,21 @@ MediFlow is a composable confidential health records system built on [Zama FHEVM
 PatientPortal (React)
   └─ @zama-fhe/react-sdk · useEncrypt()
        └─ RelayerWeb → Zama Sepolia relayer
-            └─ PatientRegistry.sol
+            └─ PatientRegistry.sol  0x511C202C1b5Cf3dfDd23688F4050E36aD3737837
                  ├─ euint64 riskScore
                  ├─ euint64 conditionFlags
                  ├─ euint64 age
                  └─ euint64 medCount
 
-HealthQueryEngine.sol
+HealthQueryEngine.sol  0xF29726623559de96BDBE89E64A53Bc63A78eec07
   └─ runEligibilityCheck(patient, maxRisk) → bytes32 checkId
        └─ FHE.gt(riskScore, threshold) → encrypted result stored on-chain
 
-InsuranceModule.sol
+InsuranceModule.sol  0x88cF8Abd11F3CAa0708398FaE9a2bFBc8b1460ED
   └─ processClaimPayment(patient, checkId)
        └─ reads encrypted eligibility → triggers ETH payout
 
-ResearchRegistry.sol
+ResearchRegistry.sol  0x0a720C544819f768101f568C812479cc65bf134e
   └─ registerCohort(institution, patients[])
        └─ FHE aggregate only — no individual decryption
 ```
@@ -87,20 +113,27 @@ pnpm --filter @workspace/mediflow-ui run dev
 # Typecheck
 pnpm --filter @workspace/mediflow-ui exec tsc --noEmit
 
+# Build (static, for Vercel/CDN)
+cd artifacts/mediflow-ui && NODE_ENV=production npx vite build --config vite.config.ts
+
 # Contracts (standalone npm project — NOT pnpm workspace)
 cd mediflow-contracts
 npm install
 echo 'n' | npx hardhat compile
 echo 'n' | npx hardhat test
 npx hardhat run scripts/deploy.ts --network sepolia
+
+# Deploy to Vercel (requires VERCEL_TOKEN env var)
+npx vercel deploy artifacts/mediflow-ui/dist/public --prod --yes --token=$VERCEL_TOKEN
 ```
 
-Required env vars after deploy (set in Replit Secrets):
+Required env vars (set in Replit Secrets and in `artifacts/mediflow-ui/.env`):
 ```
-VITE_PATIENT_REGISTRY_ADDRESS=0x...
-VITE_HEALTH_QUERY_ENGINE_ADDRESS=0x...
-VITE_INSURANCE_MODULE_ADDRESS=0x...
-VITE_RESEARCH_REGISTRY_ADDRESS=0x...
+VITE_PATIENT_REGISTRY_ADDRESS=0x511C202C1b5Cf3dfDd23688F4050E36aD3737837
+VITE_HEALTH_QUERY_ENGINE_ADDRESS=0xF29726623559de96BDBE89E64A53Bc63A78eec07
+VITE_INSURANCE_MODULE_ADDRESS=0x88cF8Abd11F3CAa0708398FaE9a2bFBc8b1460ED
+VITE_RESEARCH_REGISTRY_ADDRESS=0x0a720C544819f768101f568C812479cc65bf134e
+VITE_MOCK_PAYMENT_VAULT_ADDRESS=0xeD7F64Efc6B17ecebb2958FFD4E3580529560217
 VITE_WALLETCONNECT_PROJECT_ID=...   # optional; MetaMask works without it
 ```
 
@@ -113,6 +146,7 @@ VITE_WALLETCONNECT_PROJECT_ID=...   # optional; MetaMask works without it
 - COOP `same-origin` + COEP `credentialless` headers required for FHE WASM SharedArrayBuffer. `credentialless` (not `require-corp`) is used because RainbowKit loads cross-origin wallet icons.
 - `@zama-fhe/relayer-sdk` stays in `optimizeDeps.exclude` even after migration — the new SDK re-exports types from its bundle and carries the same WASM files.
 - Contract addresses default to `0x000…0` when env vars absent; `CONTRACTS_DEPLOYED` flag gates all write buttons.
+- The seed script (`scripts/seed.ts`) requires 7 Hardhat signers — it works on local hardhat network only, not on Sepolia with a single key.
 
 ---
 

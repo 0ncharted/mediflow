@@ -1,0 +1,13 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2026-06-06",
+  "deployer": "0x14A905eE9F79F871EaeEA20Aa932292BC472B435",
+  "contracts": {
+    "PatientRegistry":  "0x511C202C1b5Cf3dfDd23688F4050E36aD3737837",
+    "HealthQueryEngine":"0xF29726623559de96BDBE89E64A53Bc63A78eec07",
+    "ResearchRegistry": "0x0a720C544819f768101f568C812479cc65bf134e",
+    "InsuranceModule":  "0x88cF8Abd11F3CAa0708398FaE9a2bFBc8b1460ED",
+    "MockPaymentVault": "0xeD7F64Efc6B17ecebb2958FFD4E3580529560217"
+  }
+}
