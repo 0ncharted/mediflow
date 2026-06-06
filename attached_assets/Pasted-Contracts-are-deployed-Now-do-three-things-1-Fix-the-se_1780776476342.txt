@@ -1,0 +1,66 @@
+Contracts are deployed. Now do three things:
+
+1. Fix the seed script to work with a single signer.
+   Replace scripts/seed.ts entirely with this simplified version:
+
+   import { ethers } from "hardhat"
+   import { createFhevmInstance } from "@fhevm/hardhat-plugin"
+   
+   async function main() {
+     const [owner] = await ethers.getSigners()
+     console.log("Seeding with:", owner.address)
+     
+     const deployments = require("./deployments/sepolia.json")
+     const registry = await ethers.getContractAt(
+       "PatientRegistry", 
+       deployments.PatientRegistry
+     )
+     const researchRegistry = await ethers.getContractAt(
+       "ResearchRegistry",
+       deployments.ResearchRegistry  
+     )
+     const vault = await ethers.getContractAt(
+       "MockPaymentVault",
+       deployments.MockPaymentVault
+     )
+     
+     // Approve research institution (owner address as demo institution)
+     const tx1 = await researchRegistry.approveInstitution(
+       owner.address,
+       "Demo Research Institute",
+       "Clinical trial demonstration"
+     )
+     await tx1.wait()
+     console.log("Institution approved. Tx:", tx1.hash)
+     
+     // Seed vault with ETH for demo payouts
+     const tx2 = await vault.depositFunds({ 
+       value: ethers.parseEther("0.01") 
+     })
+     await tx2.wait()
+     console.log("Vault seeded. Tx:", tx2.hash)
+     console.log("Etherscan:", 
+       `https://sepolia.etherscan.io/tx/${tx2.hash}`)
+     
+     console.log("\nSeed complete. Contract addresses:")
+     console.log(JSON.stringify(deployments, null, 2))
+   }
+   
+   main().catch(console.error)
+
+   Run: cd mediflow-contracts && npx hardhat run scripts/seed.ts --network sepolia
+   Print every transaction hash and Etherscan link.
+
+2. Publish the mediflow-ui app on Replit (same way 
+   ConfidentialFlow was published — click Deploy in Replit UI).
+   Print the .replit.app URL when live.
+
+3. After publishing, update the README:
+   - Add the live .replit.app URL as the Live Demo link
+   - Update the Deployed Contracts table with Etherscan links:
+     https://sepolia.etherscan.io/address/0x[address]
+   - PatientRegistry: 0x511C202C1b5Cf3dfDd23688F4050E36aD3737837
+   - HealthQueryEngine: 0xF29726623559de96BDBE89E64A53Bc63A78eec07
+   - InsuranceModule: 0x88cF8Abd11F3CAa0708398FaE9a2bFBc8b1460ED
+   - ResearchRegistry: 0x0a720C544819f768101f568C812479cc65bf134e
+   - MockPaymentVault: 0xeD7F64Efc6B17ecebb2958FFD4E3580529560217
