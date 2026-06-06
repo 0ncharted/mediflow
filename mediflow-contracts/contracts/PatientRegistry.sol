@@ -16,6 +16,9 @@ import { ZamaEthereumConfig } from "@fhevm/solidity/config/ZamaConfig.sol";
  * @dev All health values are stored as euint64 FHE handles. No plaintext health data
  *      is ever stored on-chain or emitted in events. fromExternal grants only TRANSIENT
  *      ACL; FHE.allowThis is required after every stored computation to persist access.
+ *      The queryEngineAddress receives automatic ACL on every registerPatient call so
+ *      HealthQueryEngine can run FHE operations on patient handles without a separate
+ *      authorizeProvider call per patient.
  */
 contract PatientRegistry is ZamaEthereumConfig {
 
@@ -47,6 +50,18 @@ contract PatientRegistry is ZamaEthereumConfig {
      */
     mapping(address => mapping(address => bool)) public providerAuthorized;
 
+    /** @notice Owner of this registry; only owner may call setQueryEngine. */
+    address private _owner;
+
+    /**
+     * @notice Address of the HealthQueryEngine contract.
+     * @dev When set (non-zero), registerPatient automatically grants the engine
+     *      persistent read-ACL on all four encrypted fields so eligibility checks
+     *      can run without requiring a separate authorizeProvider call per patient.
+     *      Set once post-deployment via setQueryEngine.
+     */
+    address public queryEngineAddress;
+
     /*************** Events ***************/
 
     /** @notice Emitted when a patient successfully registers or re-registers. No health data emitted. */
@@ -58,13 +73,49 @@ contract PatientRegistry is ZamaEthereumConfig {
     /** @notice Emitted when a patient updates their encrypted risk score. */
     event RiskScoreUpdated(address indexed patient, uint256 indexed timestamp);
 
+    /** @notice Emitted when the owner updates the query engine address. */
+    event QueryEngineSet(address indexed queryEngine);
+
+    /*************** Modifiers ***************/
+
+    /** @notice Restricts caller to the contract owner (deployer). */
+    modifier onlyOwner() {
+        require(msg.sender == _owner, "Not owner");
+        _;
+    }
+
+    /*************** Constructor ***************/
+
+    /**
+     * @notice Deploys the registry and records the deployer as owner.
+     * @dev Owner is used only to call setQueryEngine once post-deployment.
+     */
+    constructor() {
+        _owner = msg.sender;
+    }
+
     /*************** External Functions ***************/
+
+    /**
+     * @notice Set the HealthQueryEngine address so registerPatient can grant it ACL automatically.
+     * @dev Can only be called by the registry owner. Should be called once immediately after
+     *      deploying both contracts. A zero address argument is rejected.
+     *      Emits QueryEngineSet on success.
+     * @param addr Address of the deployed HealthQueryEngine contract.
+     */
+    function setQueryEngine(address addr) external onlyOwner {
+        require(addr != address(0), "Zero address");
+        queryEngineAddress = addr;
+        emit QueryEngineSet(addr);
+    }
 
     /**
      * @notice Register or update a patient record with four encrypted health attributes.
      * @dev Each externalEuint64 is verified via ZK proof and converted to a persistent handle.
      *      FHE.fromExternal grants only transient ACL (current tx); FHE.allowThis persists it.
      *      FHE.allow(field, msg.sender) lets the patient decrypt their own values later.
+     *      If queryEngineAddress is set, FHE.allow grants the engine read-ACL on all four
+     *      fields so eligibility checks work without a separate authorizeProvider call.
      * @param _riskScore      Encrypted risk score (0-100, higher = higher risk).
      * @param _riskProof      ZK input proof bound to the same encrypt() call as _riskScore.
      * @param _conditionFlags Encrypted bitmask of conditions (bit0=diabetes, etc.).
@@ -100,18 +151,31 @@ contract PatientRegistry is ZamaEthereumConfig {
         /*
          * allowThis is mandatory: fromExternal grants only TRANSIENT ACL (expires at tx end).
          * Without this, the next tx that tries to use these handles will revert with
-         * SenderNotAllowed(address) when the contract is no longer the caller.
+         * ACLNotAllowed when the contract attempts an FHE operation on a handle it no longer owns.
          */
         FHE.allowThis(riskScore);
         FHE.allowThis(conditionFlags);
         FHE.allowThis(age);
         FHE.allowThis(medCount);
 
-        /* Patient retains persistent read ACL to decrypt their own values. */
+        /* Patient retains persistent read-ACL to decrypt their own values later. */
         FHE.allow(riskScore, msg.sender);
         FHE.allow(conditionFlags, msg.sender);
         FHE.allow(age, msg.sender);
         FHE.allow(medCount, msg.sender);
+
+        /*
+         * Grant the HealthQueryEngine persistent read-ACL on all four fields.
+         * Without this, runEligibilityCheck reverts with ACLNotAllowed when the engine
+         * attempts FHE operations on handles it has no ACL on.
+         * FHE.allowThis above covers address(this); this block covers the external engine.
+         */
+        if (queryEngineAddress != address(0)) {
+            FHE.allow(riskScore, queryEngineAddress);
+            FHE.allow(conditionFlags, queryEngineAddress);
+            FHE.allow(age, queryEngineAddress);
+            FHE.allow(medCount, queryEngineAddress);
+        }
 
         emit PatientRegistered(msg.sender, block.timestamp);
     }
@@ -133,6 +197,11 @@ contract PatientRegistry is ZamaEthereumConfig {
         /* allowThis required - transient ACL from fromExternal does not persist across txs. */
         FHE.allowThis(riskScore);
         FHE.allow(riskScore, msg.sender);
+
+        /* Re-grant query engine ACL on the updated risk score handle. */
+        if (queryEngineAddress != address(0)) {
+            FHE.allow(riskScore, queryEngineAddress);
+        }
 
         emit RiskScoreUpdated(msg.sender, block.timestamp);
     }
@@ -166,7 +235,7 @@ contract PatientRegistry is ZamaEthereumConfig {
      * @dev Returns raw euint64 handles. This function is view-safe because it only reads
      *      stored handles without invoking any FHE operation or ACL-modifying call.
      *      Callers who intend to perform FHE operations on the returned handles must
-     *      already have been granted ACL via authorizeProvider.
+     *      already have been granted ACL via authorizeProvider or automatic engine grant.
      * @param patient Address of the patient to query.
      * @return The PatientRecord struct containing all four encrypted field handles.
      */

@@ -60,6 +60,11 @@ async function main(): Promise<void> {
     /* ===== Wire contracts together ===== */
     console.log("\nWiring contracts...");
 
+    /* Grant HealthQueryEngine automatic ACL on every future registerPatient call. */
+    const txSetQEInReg = await registry.setQueryEngine(engineAddr);
+    await txSetQEInReg.wait();
+    console.log("PatientRegistry.setQueryEngine done");
+
     const txSetIns = await engine.setInsuranceModule(insuranceAddr);
     await txSetIns.wait();
     console.log("HealthQueryEngine.setInsuranceModule done");

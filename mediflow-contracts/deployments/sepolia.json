@@ -4,10 +4,11 @@
   "deployedAt": "2026-06-06",
   "deployer": "0x14A905eE9F79F871EaeEA20Aa932292BC472B435",
   "contracts": {
-    "PatientRegistry":  "0x511C202C1b5Cf3dfDd23688F4050E36aD3737837",
-    "HealthQueryEngine":"0xF29726623559de96BDBE89E64A53Bc63A78eec07",
-    "ResearchRegistry": "0x0a720C544819f768101f568C812479cc65bf134e",
-    "InsuranceModule":  "0x88cF8Abd11F3CAa0708398FaE9a2bFBc8b1460ED",
-    "MockPaymentVault": "0xeD7F64Efc6B17ecebb2958FFD4E3580529560217"
-  }
+    "PatientRegistry":  "0x39e50e384f0d4DB24d2FD9BcF98c954C551Bfa71",
+    "HealthQueryEngine":"0xB0e3cA8c95705F1E61D5c5f5575fBEBC269Aee95",
+    "ResearchRegistry": "0x6F27ad8aa0aDc0e8D4090Cede877F3EA82808d22",
+    "InsuranceModule":  "0xe0d3F99414d05fe2f1d6b087A114fC12A2b9b5a6",
+    "MockPaymentVault": "0xF8bE9FcDfbB22DE62C09ae18fd09146DE2711d71"
+  },
+  "notes": "PatientRegistry v2: queryEngineAddress state variable + setQueryEngine(). registerPatient now auto-grants HealthQueryEngine ACL on all four encrypted fields via FHE.allow so eligibility checks no longer require a separate authorizeProvider call."
 }

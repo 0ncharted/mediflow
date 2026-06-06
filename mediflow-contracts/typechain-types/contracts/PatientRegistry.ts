@@ -59,7 +59,9 @@ export interface PatientRegistryInterface extends Interface {
       | "getPatientRecord"
       | "isEnrolled"
       | "providerAuthorized"
+      | "queryEngineAddress"
       | "registerPatient"
+      | "setQueryEngine"
       | "updateRiskScore"
   ): FunctionFragment;
 
@@ -67,6 +69,7 @@ export interface PatientRegistryInterface extends Interface {
     nameOrSignatureOrTopic:
       | "PatientRegistered"
       | "ProviderAuthorized"
+      | "QueryEngineSet"
       | "RiskScoreUpdated"
   ): EventFragment;
 
@@ -95,6 +98,10 @@ export interface PatientRegistryInterface extends Interface {
     values: [AddressLike, AddressLike]
   ): string;
   encodeFunctionData(
+    functionFragment: "queryEngineAddress",
+    values?: undefined
+  ): string;
+  encodeFunctionData(
     functionFragment: "registerPatient",
     values: [
       BytesLike,
@@ -106,6 +113,10 @@ export interface PatientRegistryInterface extends Interface {
       BytesLike,
       BytesLike
     ]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setQueryEngine",
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "updateRiskScore",
@@ -134,7 +145,15 @@ export interface PatientRegistryInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "queryEngineAddress",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "registerPatient",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setQueryEngine",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -162,6 +181,18 @@ export namespace ProviderAuthorizedEvent {
   export interface OutputObject {
     patient: string;
     provider: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace QueryEngineSetEvent {
+  export type InputTuple = [queryEngine: AddressLike];
+  export type OutputTuple = [queryEngine: string];
+  export interface OutputObject {
+    queryEngine: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -253,6 +284,8 @@ export interface PatientRegistry extends BaseContract {
     "view"
   >;
 
+  queryEngineAddress: TypedContractMethod<[], [string], "view">;
+
   registerPatient: TypedContractMethod<
     [
       _riskScore: BytesLike,
@@ -264,6 +297,12 @@ export interface PatientRegistry extends BaseContract {
       _medCount: BytesLike,
       _medProof: BytesLike
     ],
+    [void],
+    "nonpayable"
+  >;
+
+  setQueryEngine: TypedContractMethod<
+    [addr: AddressLike],
     [void],
     "nonpayable"
   >;
@@ -309,6 +348,9 @@ export interface PatientRegistry extends BaseContract {
     "view"
   >;
   getFunction(
+    nameOrSignature: "queryEngineAddress"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
     nameOrSignature: "registerPatient"
   ): TypedContractMethod<
     [
@@ -324,6 +366,9 @@ export interface PatientRegistry extends BaseContract {
     [void],
     "nonpayable"
   >;
+  getFunction(
+    nameOrSignature: "setQueryEngine"
+  ): TypedContractMethod<[addr: AddressLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "updateRiskScore"
   ): TypedContractMethod<
@@ -345,6 +390,13 @@ export interface PatientRegistry extends BaseContract {
     ProviderAuthorizedEvent.InputTuple,
     ProviderAuthorizedEvent.OutputTuple,
     ProviderAuthorizedEvent.OutputObject
+  >;
+  getEvent(
+    key: "QueryEngineSet"
+  ): TypedContractEvent<
+    QueryEngineSetEvent.InputTuple,
+    QueryEngineSetEvent.OutputTuple,
+    QueryEngineSetEvent.OutputObject
   >;
   getEvent(
     key: "RiskScoreUpdated"
@@ -375,6 +427,17 @@ export interface PatientRegistry extends BaseContract {
       ProviderAuthorizedEvent.InputTuple,
       ProviderAuthorizedEvent.OutputTuple,
       ProviderAuthorizedEvent.OutputObject
+    >;
+
+    "QueryEngineSet(address)": TypedContractEvent<
+      QueryEngineSetEvent.InputTuple,
+      QueryEngineSetEvent.OutputTuple,
+      QueryEngineSetEvent.OutputObject
+    >;
+    QueryEngineSet: TypedContractEvent<
+      QueryEngineSetEvent.InputTuple,
+      QueryEngineSetEvent.OutputTuple,
+      QueryEngineSetEvent.OutputObject
     >;
 
     "RiskScoreUpdated(address,uint256)": TypedContractEvent<

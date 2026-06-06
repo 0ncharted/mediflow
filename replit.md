@@ -10,6 +10,12 @@ Composable confidential health records system on Zama FHEVM v0.11 — patients s
   - `echo 'n' | npx hardhat test` — run tests (skip analytics prompt)
   - `npx hardhat run scripts/deploy.ts --network sepolia` — deploy to Sepolia
 - `pnpm --filter @workspace/mediflow-ui exec tsc --noEmit` — typecheck frontend
+- Current deployed addresses (Sepolia, 2026-06-06):
+  - `VITE_PATIENT_REGISTRY_ADDRESS=0x39e50e384f0d4DB24d2FD9BcF98c954C551Bfa71`
+  - `VITE_HEALTH_QUERY_ENGINE_ADDRESS=0xB0e3cA8c95705F1E61D5c5f5575fBEBC269Aee95`
+  - `VITE_INSURANCE_MODULE_ADDRESS=0xe0d3F99414d05fe2f1d6b087A114fC12A2b9b5a6`
+  - `VITE_RESEARCH_REGISTRY_ADDRESS=0x6F27ad8aa0aDc0e8D4090Cede877F3EA82808d22`
+  - `VITE_MOCK_PAYMENT_VAULT_ADDRESS=0xF8bE9FcDfbB22DE62C09ae18fd09146DE2711d71`
 - Required env after deploy: `VITE_PATIENT_REGISTRY_ADDRESS`, `VITE_HEALTH_QUERY_ENGINE_ADDRESS`, `VITE_INSURANCE_MODULE_ADDRESS`, `VITE_RESEARCH_REGISTRY_ADDRESS`
 - Optional env: `VITE_WALLETCONNECT_PROJECT_ID` (without it: MetaMask/injected only)
 
