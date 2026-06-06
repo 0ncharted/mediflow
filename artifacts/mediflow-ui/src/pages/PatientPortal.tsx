@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
 import {
   useAccount,
+  useChainId,
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
+import { sepolia } from "wagmi/chains";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { toHex, formatEther } from "viem";
-import { useFhevm } from "@/hooks/useFhevm";
+import { bytesToHex, formatEther } from "viem";
+import { useEncrypt } from "@zama-fhe/react-sdk";
+import { useRelayerStatus } from "@/providers";
 import {
   PATIENT_REGISTRY_ADDRESS,
   PATIENT_REGISTRY_ABI,
@@ -21,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import {
   Shield,
   Lock,
-  User,
   Activity,
   ChevronRight,
   CheckCircle,
@@ -29,6 +31,7 @@ import {
   FileText,
   UserPlus,
   Ban,
+  KeyRound,
 } from "lucide-react";
 
 const NULL_ADDR = "0x0000000000000000000000000000000000000000" as const;
@@ -39,14 +42,32 @@ const CONDITIONS = [
   { label: "Cardiac History", bit: 4 },
 ];
 
+const FIELDS = [
+  { label: "Risk Score", index: 0 },
+  { label: "Condition Flags", index: 1 },
+  { label: "Age", index: 2 },
+  { label: "Medication Count", index: 3 },
+];
+
 interface ProviderEntry {
   address: string;
   grantedAt: string;
 }
 
+interface DelegateEntry {
+  address: string;
+  field: string;
+  grantedAt: string;
+}
+
 export default function PatientPortal() {
   const { address, isConnected } = useAccount();
-  const { instance, loading: fheLoading, error: fheError } = useFhevm();
+  const chainId = useChainId();
+  const isSepolia = chainId === sepolia.id;
+  const relayerStatus = useRelayerStatus();
+  const fheReady = isConnected && isSepolia;
+
+  const encrypt = useEncrypt();
 
   const [riskScore, setRiskScore] = useState(37);
   const [conditionFlags, setConditionFlags] = useState(2);
@@ -58,6 +79,12 @@ export default function PatientPortal() {
 
   const [providerInput, setProviderInput] = useState("");
   const [providers, setProviders] = useState<ProviderEntry[]>([]);
+
+  const [delegateAddr, setDelegateAddr] = useState("");
+  const [selectedFieldIndex, setSelectedFieldIndex] = useState(0);
+  const [delegates, setDelegates] = useState<DelegateEntry[]>([]);
+  const [lastDelegateAddr, setLastDelegateAddr] = useState("");
+  const [lastDelegateField, setLastDelegateField] = useState("");
 
   const queryAddr = (address ?? NULL_ADDR) as `0x${string}`;
 
@@ -85,6 +112,14 @@ export default function PatientPortal() {
     error: grantError,
   } = useWriteContract();
   const { isSuccess: grantSuccess } = useWaitForTransactionReceipt({ hash: grantHash });
+
+  const {
+    writeContract: grantDelegate,
+    data: delegateHash,
+    isPending: delegating,
+    error: delegateError,
+  } = useWriteContract();
+  const { isSuccess: delegateSuccess } = useWaitForTransactionReceipt({ hash: delegateHash });
 
   const { data: policy } = useReadContract({
     address: INSURANCE_MODULE_ADDRESS,
@@ -120,27 +155,48 @@ export default function PatientPortal() {
     }
   }, [grantSuccess, lastGrantAddr]);
 
+  useEffect(() => {
+    if (delegateSuccess && lastDelegateAddr) {
+      setDelegates((d) => [
+        ...d,
+        {
+          address: lastDelegateAddr,
+          field: lastDelegateField,
+          grantedAt: new Date().toLocaleDateString(),
+        },
+      ]);
+      setLastDelegateAddr("");
+      setLastDelegateField("");
+      setDelegateAddr("");
+    }
+  }, [delegateSuccess, lastDelegateAddr, lastDelegateField]);
+
   const handleEncryptAndStore = async () => {
-    if (!instance || !address) return;
+    if (!address) return;
     setTxStatus("encrypting");
     setTxError(null);
     resetRegister();
     try {
-      const inputRisk = instance.createEncryptedInput(PATIENT_REGISTRY_ADDRESS, address);
-      inputRisk.add64(BigInt(riskScore));
-      const encRisk = await inputRisk.encrypt();
-
-      const inputFlags = instance.createEncryptedInput(PATIENT_REGISTRY_ADDRESS, address);
-      inputFlags.add64(BigInt(conditionFlags));
-      const encFlags = await inputFlags.encrypt();
-
-      const inputAge = instance.createEncryptedInput(PATIENT_REGISTRY_ADDRESS, address);
-      inputAge.add64(BigInt(age));
-      const encAge = await inputAge.encrypt();
-
-      const inputMed = instance.createEncryptedInput(PATIENT_REGISTRY_ADDRESS, address);
-      inputMed.add64(BigInt(medCount));
-      const encMed = await inputMed.encrypt();
+      const encRisk = await encrypt.mutateAsync({
+        values: [{ value: BigInt(riskScore), type: "euint64" }],
+        contractAddress: PATIENT_REGISTRY_ADDRESS,
+        userAddress: address,
+      });
+      const encFlags = await encrypt.mutateAsync({
+        values: [{ value: BigInt(conditionFlags), type: "euint64" }],
+        contractAddress: PATIENT_REGISTRY_ADDRESS,
+        userAddress: address,
+      });
+      const encAge = await encrypt.mutateAsync({
+        values: [{ value: BigInt(age), type: "euint64" }],
+        contractAddress: PATIENT_REGISTRY_ADDRESS,
+        userAddress: address,
+      });
+      const encMed = await encrypt.mutateAsync({
+        values: [{ value: BigInt(medCount), type: "euint64" }],
+        contractAddress: PATIENT_REGISTRY_ADDRESS,
+        userAddress: address,
+      });
 
       setTxStatus("submitting");
       register({
@@ -148,14 +204,14 @@ export default function PatientPortal() {
         abi: PATIENT_REGISTRY_ABI,
         functionName: "registerPatient",
         args: [
-          toHex(encRisk.handles[0]),
-          toHex(encRisk.inputProof),
-          toHex(encFlags.handles[0]),
-          toHex(encFlags.inputProof),
-          toHex(encAge.handles[0]),
-          toHex(encAge.inputProof),
-          toHex(encMed.handles[0]),
-          toHex(encMed.inputProof),
+          bytesToHex(encRisk.handles[0]),
+          bytesToHex(encRisk.inputProof),
+          bytesToHex(encFlags.handles[0]),
+          bytesToHex(encFlags.inputProof),
+          bytesToHex(encAge.handles[0]),
+          bytesToHex(encAge.inputProof),
+          bytesToHex(encMed.handles[0]),
+          bytesToHex(encMed.inputProof),
         ],
       });
     } catch (e) {
@@ -175,6 +231,19 @@ export default function PatientPortal() {
     });
   };
 
+  const handleGrantDelegatedAccess = () => {
+    if (!delegateAddr.startsWith("0x")) return;
+    const fieldLabel = FIELDS[selectedFieldIndex]?.label ?? "Unknown";
+    setLastDelegateAddr(delegateAddr);
+    setLastDelegateField(fieldLabel);
+    grantDelegate({
+      address: PATIENT_REGISTRY_ADDRESS,
+      abi: PATIENT_REGISTRY_ABI,
+      functionName: "grantDelegatedFieldAccess",
+      args: [delegateAddr as `0x${string}`, selectedFieldIndex],
+    });
+  };
+
   const toggleCondition = (bit: number) => {
     setConditionFlags((f) => f ^ bit);
   };
@@ -186,6 +255,28 @@ export default function PatientPortal() {
   const activeConditionLabels = CONDITIONS.filter((c) => conditionFlags & c.bit).map(
     (c) => c.label,
   );
+
+  const fheStatusColor =
+    !isConnected
+      ? "bg-muted-foreground/40"
+      : !isSepolia
+        ? "bg-amber-400"
+        : relayerStatus === "loading"
+          ? "bg-yellow-400 animate-pulse"
+          : relayerStatus === "error"
+            ? "bg-red-500"
+            : "bg-green-400";
+
+  const fheStatusText =
+    !isConnected
+      ? "Connect wallet to enable FHE"
+      : !isSepolia
+        ? "Switch to Sepolia to enable FHE"
+        : relayerStatus === "loading"
+          ? "Initializing Zama FHE SDK…"
+          : relayerStatus === "error"
+            ? "FHE SDK error — check console"
+            : "FHE SDK ready — encryption runs entirely in your browser";
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-background">
@@ -234,26 +325,8 @@ export default function PatientPortal() {
 
         {isConnected && (
           <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-card border border-card-border text-sm">
-            <div
-              className={`h-2 w-2 rounded-full shrink-0 ${
-                fheLoading
-                  ? "bg-yellow-400 animate-pulse"
-                  : fheError
-                    ? "bg-red-500"
-                    : instance
-                      ? "bg-green-400"
-                      : "bg-muted-foreground"
-              }`}
-            />
-            <span className="text-muted-foreground text-xs">
-              {fheLoading
-                ? "Initializing Zama FHE SDK…"
-                : fheError
-                  ? `FHE: ${fheError}`
-                  : instance
-                    ? "FHE SDK ready — encryption runs entirely in your browser"
-                    : "FHE SDK not initialized"}
-            </span>
+            <div className={`h-2 w-2 rounded-full shrink-0 ${fheStatusColor}`} />
+            <span className="text-muted-foreground text-xs">{fheStatusText}</span>
             {isEnrolled !== undefined && (
               <span
                 className={`ml-auto text-xs font-medium ${isEnrolled ? "text-green-400" : "text-muted-foreground"}`}
@@ -278,9 +351,7 @@ export default function PatientPortal() {
               <label className="text-sm font-medium text-foreground mb-1 block">
                 General Health Risk Score
               </label>
-              <p className="text-xs text-muted-foreground mb-3">
-                0 = healthy, 100 = high risk
-              </p>
+              <p className="text-xs text-muted-foreground mb-3">0 = healthy, 100 = high risk</p>
               <div className="flex items-center gap-4">
                 <input
                   type="range"
@@ -396,7 +467,7 @@ export default function PatientPortal() {
             <div className="pt-2 border-t border-border space-y-3">
               <TransactionToast
                 status={txStatus}
-                encryptingMessage="Encrypting your data locally… (4 separate FHE ciphertexts)"
+                encryptingMessage="Encrypting your data locally… (4 FHE ciphertexts via @zama-fhe/react-sdk)"
                 submittingMessage="Submitting to Sepolia…"
                 successMessage="✅ Encrypted record stored on-chain. Your raw data never left your device."
                 errorMessage={txError}
@@ -406,7 +477,7 @@ export default function PatientPortal() {
                 onClick={() => { void handleEncryptAndStore(); }}
                 disabled={
                   !isConnected ||
-                  !instance ||
+                  !fheReady ||
                   registering ||
                   txStatus === "encrypting" ||
                   txStatus === "submitting" ||
@@ -424,7 +495,7 @@ export default function PatientPortal() {
                   Connect wallet to encrypt and register
                 </p>
               )}
-              {isConnected && !instance && !fheLoading && (
+              {isConnected && !isSepolia && (
                 <p className="text-xs text-center text-muted-foreground">
                   Switch to Sepolia to enable FHE encryption
                 </p>
@@ -501,6 +572,113 @@ export default function PatientPortal() {
                       <Ban className="h-3 w-3" /> Revoke
                       <span className="text-xs text-muted-foreground">(post-MVP)</span>
                     </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ──────────────────────────── SECTION B.2 ──────────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-6 w-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary">
+              B2
+            </div>
+            <h2 className="text-base font-semibold text-foreground">Delegated Decryption</h2>
+          </div>
+
+          <div className="rounded-xl bg-card border border-card-border p-6 space-y-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">
+                Grant a regulator, auditor, or research institution the ability to decrypt{" "}
+                <strong>one specific field</strong> of your record — not the whole record. This
+                calls{" "}
+                <code className="font-mono bg-muted/50 px-1 rounded">
+                  TFHE.allow(encryptedField, grantee)
+                </code>{" "}
+                on-chain for only the selected ciphertext.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">
+                  Grantee address (auditor / regulator)
+                </label>
+                <Input
+                  placeholder="0x… grantee wallet"
+                  value={delegateAddr}
+                  onChange={(e) => setDelegateAddr(e.target.value)}
+                  className="font-mono text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Field</label>
+                <select
+                  value={selectedFieldIndex}
+                  onChange={(e) => setSelectedFieldIndex(Number(e.target.value))}
+                  className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  {FIELDS.map((f) => (
+                    <option key={f.index} value={f.index}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button
+                onClick={handleGrantDelegatedAccess}
+                disabled={
+                  !isConnected ||
+                  !delegateAddr.startsWith("0x") ||
+                  delegating ||
+                  !CONTRACTS_DEPLOYED
+                }
+                variant="outline"
+                className="gap-2 shrink-0"
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                {delegating ? "Granting…" : "Grant Field Access"}
+              </Button>
+            </div>
+
+            {delegateError && (
+              <p className="text-xs text-destructive">{delegateError.message.slice(0, 120)}</p>
+            )}
+
+            <div className="p-3 rounded-lg bg-muted/20 border border-border/60 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground/70">How field-level delegation works:</p>
+              <ol className="list-decimal list-inside space-y-0.5 pl-1">
+                <li>
+                  Patient calls <code className="font-mono">grantDelegatedFieldAccess(grantee, fieldIndex)</code>
+                </li>
+                <li>
+                  Contract calls <code className="font-mono">TFHE.allow(patient.fields[fieldIndex], grantee)</code>
+                </li>
+                <li>Grantee can now request KMS decryption of that single handle only</li>
+                <li>All other fields remain inaccessible to the grantee</li>
+              </ol>
+            </div>
+
+            {delegates.length === 0 ? (
+              <div className="py-4 text-center text-sm text-muted-foreground border border-dashed border-border rounded-lg">
+                No delegated field access granted yet
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {delegates.map((d, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between px-4 py-3 rounded-lg bg-muted/20 border border-border"
+                  >
+                    <div>
+                      <p className="text-xs font-mono text-foreground">{d.address}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        <span className="text-primary/70 font-medium">{d.field}</span>
+                        {" · "}granted {d.grantedAt}
+                      </p>
+                    </div>
                   </div>
                 ))}
               </div>

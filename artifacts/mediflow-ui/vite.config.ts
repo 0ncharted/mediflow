@@ -59,7 +59,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   optimizeDeps: {
-    exclude: ["@zama-fhe/relayer-sdk"],
+    exclude: ["@zama-fhe/relayer-sdk", "@zama-fhe/sdk", "@zama-fhe/react-sdk"],
   },
   worker: {
     format: "es",

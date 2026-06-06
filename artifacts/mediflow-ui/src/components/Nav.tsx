@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Shield } from "lucide-react";
+import { RelayerDot } from "@/components/RelayerDot";
 
 const LINKS = [
   { href: "/", label: "Patient Portal" },
@@ -39,7 +40,10 @@ export default function Nav() {
           ))}
         </nav>
 
-        <ConnectButton chainStatus="icon" showBalance={false} />
+        <div className="flex items-center gap-3">
+          <RelayerDot />
+          <ConnectButton chainStatus="icon" showBalance={false} />
+        </div>
       </div>
     </header>
   );

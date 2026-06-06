@@ -100,11 +100,30 @@ export const PATIENT_REGISTRY_ABI = [
     ],
   },
   {
+    name: "grantDelegatedFieldAccess",
+    type: "function",
+    inputs: [
+      { name: "grantee", type: "address" },
+      { name: "fieldIndex", type: "uint8" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
     name: "ProviderAuthorized",
     type: "event",
     inputs: [
       { indexed: true, name: "patient", type: "address" },
       { indexed: true, name: "provider", type: "address" },
+    ],
+  },
+  {
+    name: "FieldAccessDelegated",
+    type: "event",
+    inputs: [
+      { indexed: true, name: "patient", type: "address" },
+      { indexed: true, name: "grantee", type: "address" },
+      { indexed: false, name: "fieldIndex", type: "uint8" },
     ],
   },
 ] as const;

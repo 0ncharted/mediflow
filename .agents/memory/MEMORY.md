@@ -1,1 +1,3 @@
 - [MediFlow FHE frontend patterns](mediflow-fhevm-frontend.md) — FHEVM relayer-sdk web import, 4-proof registerPatient, non-view runEligibilityCheck
+- [Zama SDK v3 wagmi fix](zama-sdk-wagmi-compat.md) — WagmiSigner from @zama-fhe/react-sdk@3 breaks on wagmi>=2.19 (watchConnection renamed); use custom signer via @wagmi/core with `cfg as any`.
+- [Zama SDK v3 migration patterns](zama-sdk-v3-patterns.md) — ZamaProvider tree order, useEncrypt mutation pattern, RelayerDot status, delegated decryption via grantDelegatedFieldAccess.
