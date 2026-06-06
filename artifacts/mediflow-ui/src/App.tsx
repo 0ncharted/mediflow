@@ -7,6 +7,7 @@ import PatientPortal from "@/pages/PatientPortal";
 import HospitalQuery from "@/pages/HospitalQuery";
 import InsuranceModule from "@/pages/InsuranceModule";
 import ResearchRegistry from "@/pages/ResearchRegistry";
+import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/hospital" component={HospitalQuery} />
       <Route path="/insurance" component={InsuranceModule} />
       <Route path="/research" component={ResearchRegistry} />
+      <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>
   );

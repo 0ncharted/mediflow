@@ -4,9 +4,10 @@ import { Shield } from "lucide-react";
 
 const LINKS = [
   { href: "/", label: "Patient Portal" },
-  { href: "/hospital", label: "Hospital Query" },
+  { href: "/hospital", label: "Provider" },
   { href: "/insurance", label: "Insurance" },
   { href: "/research", label: "Research" },
+  { href: "/admin", label: "Admin" },
 ];
 
 export default function Nav() {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useAccount,
   useReadContract,
@@ -6,13 +6,16 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { toHex } from "viem";
+import { toHex, formatEther } from "viem";
 import { useFhevm } from "@/hooks/useFhevm";
 import {
   PATIENT_REGISTRY_ADDRESS,
   PATIENT_REGISTRY_ABI,
+  INSURANCE_MODULE_ADDRESS,
+  INSURANCE_MODULE_ABI,
   CONTRACTS_DEPLOYED,
 } from "@/lib/contracts";
+import { TransactionToast, type TxStatus } from "@/components/TransactionToast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,32 +23,43 @@ import {
   Lock,
   User,
   Activity,
-  Pill,
-  ArrowRight,
+  ChevronRight,
   CheckCircle,
-  XCircle,
-  Loader2,
   AlertTriangle,
+  FileText,
+  UserPlus,
+  Ban,
 } from "lucide-react";
 
-const MOCK = {
-  name: "Alice Chen",
-  age: 42n,
-  riskScore: 37n,
-  conditionFlags: 2n,
-  medCount: 2n,
-};
-
 const NULL_ADDR = "0x0000000000000000000000000000000000000000" as const;
+
+const CONDITIONS = [
+  { label: "Diabetes", bit: 1 },
+  { label: "Hypertension", bit: 2 },
+  { label: "Cardiac History", bit: 4 },
+];
+
+interface ProviderEntry {
+  address: string;
+  grantedAt: string;
+}
 
 export default function PatientPortal() {
   const { address, isConnected } = useAccount();
   const { instance, loading: fheLoading, error: fheError } = useFhevm();
-  const [providerAddr, setProviderAddr] = useState("");
-  const [encStage, setEncStage] = useState<"idle" | "encrypting" | "done">("idle");
-  const [handles, setHandles] = useState<string[]>([]);
 
-  const queryAddr = address ?? NULL_ADDR;
+  const [riskScore, setRiskScore] = useState(37);
+  const [conditionFlags, setConditionFlags] = useState(2);
+  const [age, setAge] = useState(42);
+  const [medCount, setMedCount] = useState(2);
+
+  const [txStatus, setTxStatus] = useState<TxStatus>("idle");
+  const [txError, setTxError] = useState<string | null>(null);
+
+  const [providerInput, setProviderInput] = useState("");
+  const [providers, setProviders] = useState<ProviderEntry[]>([]);
+
+  const queryAddr = (address ?? NULL_ADDR) as `0x${string}`;
 
   const { data: isEnrolled, refetch: refetchEnrolled } = useReadContract({
     address: PATIENT_REGISTRY_ADDRESS,
@@ -55,58 +69,80 @@ export default function PatientPortal() {
     query: { enabled: isConnected && CONTRACTS_DEPLOYED },
   });
 
-  const { data: record } = useReadContract({
-    address: PATIENT_REGISTRY_ADDRESS,
-    abi: PATIENT_REGISTRY_ABI,
-    functionName: "getPatientRecord",
-    args: [queryAddr],
-    query: { enabled: isConnected && CONTRACTS_DEPLOYED && !!isEnrolled },
-  });
-
   const {
     writeContract: register,
     data: registerHash,
     isPending: registering,
     error: registerError,
+    reset: resetRegister,
   } = useWriteContract();
-  const { isLoading: registerConfirming, isSuccess: registerSuccess } =
-    useWaitForTransactionReceipt({ hash: registerHash });
+  const { isSuccess: registerSuccess } = useWaitForTransactionReceipt({ hash: registerHash });
 
   const {
     writeContract: grantAccess,
     data: grantHash,
     isPending: granting,
+    error: grantError,
   } = useWriteContract();
   const { isSuccess: grantSuccess } = useWaitForTransactionReceipt({ hash: grantHash });
 
-  const handleEncryptAndRegister = async () => {
+  const { data: policy } = useReadContract({
+    address: INSURANCE_MODULE_ADDRESS,
+    abi: INSURANCE_MODULE_ABI,
+    functionName: "getPolicy",
+    args: [queryAddr],
+    query: { enabled: isConnected && CONTRACTS_DEPLOYED },
+  });
+
+  useEffect(() => {
+    if (registerSuccess) {
+      setTxStatus("success");
+      void refetchEnrolled();
+    }
+  }, [registerSuccess, refetchEnrolled]);
+
+  useEffect(() => {
+    if (registerError && txStatus !== "idle") {
+      setTxStatus("error");
+      setTxError(registerError.message.slice(0, 200));
+    }
+  }, [registerError, txStatus]);
+
+  const [lastGrantAddr, setLastGrantAddr] = useState("");
+  useEffect(() => {
+    if (grantSuccess && lastGrantAddr) {
+      setProviders((p) => [
+        ...p,
+        { address: lastGrantAddr, grantedAt: new Date().toLocaleDateString() },
+      ]);
+      setLastGrantAddr("");
+      setProviderInput("");
+    }
+  }, [grantSuccess, lastGrantAddr]);
+
+  const handleEncryptAndStore = async () => {
     if (!instance || !address) return;
-    setEncStage("encrypting");
+    setTxStatus("encrypting");
+    setTxError(null);
+    resetRegister();
     try {
       const inputRisk = instance.createEncryptedInput(PATIENT_REGISTRY_ADDRESS, address);
-      inputRisk.add64(MOCK.riskScore);
+      inputRisk.add64(BigInt(riskScore));
       const encRisk = await inputRisk.encrypt();
 
       const inputFlags = instance.createEncryptedInput(PATIENT_REGISTRY_ADDRESS, address);
-      inputFlags.add64(MOCK.conditionFlags);
+      inputFlags.add64(BigInt(conditionFlags));
       const encFlags = await inputFlags.encrypt();
 
       const inputAge = instance.createEncryptedInput(PATIENT_REGISTRY_ADDRESS, address);
-      inputAge.add64(MOCK.age);
+      inputAge.add64(BigInt(age));
       const encAge = await inputAge.encrypt();
 
       const inputMed = instance.createEncryptedInput(PATIENT_REGISTRY_ADDRESS, address);
-      inputMed.add64(MOCK.medCount);
+      inputMed.add64(BigInt(medCount));
       const encMed = await inputMed.encrypt();
 
-      setHandles([
-        toHex(encRisk.handles[0]),
-        toHex(encFlags.handles[0]),
-        toHex(encAge.handles[0]),
-        toHex(encMed.handles[0]),
-      ]);
-      setEncStage("done");
-
+      setTxStatus("submitting");
       register({
         address: PATIENT_REGISTRY_ADDRESS,
         abi: PATIENT_REGISTRY_ABI,
@@ -123,23 +159,33 @@ export default function PatientPortal() {
         ],
       });
     } catch (e) {
-      console.error("Encryption error:", e);
-      setEncStage("idle");
+      setTxStatus("error");
+      setTxError(e instanceof Error ? e.message : "Encryption failed");
     }
   };
 
   const handleGrantAccess = () => {
-    if (!providerAddr.startsWith("0x")) return;
+    if (!providerInput.startsWith("0x")) return;
+    setLastGrantAddr(providerInput);
     grantAccess({
       address: PATIENT_REGISTRY_ADDRESS,
       abi: PATIENT_REGISTRY_ABI,
       functionName: "authorizeProvider",
-      args: [providerAddr as `0x${string}`],
+      args: [providerInput as `0x${string}`],
     });
   };
 
-  const canRegister =
-    isConnected && !!instance && !registering && !registerConfirming && encStage !== "encrypting";
+  const toggleCondition = (bit: number) => {
+    setConditionFlags((f) => f ^ bit);
+  };
+
+  const policyData = policy as
+    | { monthlyPremium: bigint; coverageAmount: bigint; riskThreshold: bigint; active: boolean }
+    | undefined;
+
+  const activeConditionLabels = CONDITIONS.filter((c) => conditionFlags & c.bit).map(
+    (c) => c.label,
+  );
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-background">
@@ -150,47 +196,44 @@ export default function PatientPortal() {
               <Shield className="h-5 w-5 text-primary" />
             </div>
             <span className="text-xs text-muted-foreground border border-muted-foreground/25 rounded-full px-2.5 py-0.5">
-              Zama FHEVM v0.11 · Sepolia
+              Zama FHEVM v0.11 · Sepolia Testnet
             </span>
+            {isConnected && (
+              <span className="text-xs font-mono text-muted-foreground">
+                {address?.slice(0, 6)}…{address?.slice(-4)}
+              </span>
+            )}
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">
-            Your Health Record, Encrypted and Private
+            Patient Health Portal
           </h1>
-          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-            Health data is encrypted client-side using fully homomorphic encryption before being
-            stored on-chain. Your raw values never appear on the blockchain — providers query
-            only with your authorization.
+          <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed">
+            Your health attributes are encrypted with FHE before being stored on-chain.
+            Raw values never leave your browser. Providers see only the computed result.
           </p>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-5">
+      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
         <div className="flex items-start gap-2 p-4 rounded-lg bg-amber-500/8 border border-amber-500/25 text-amber-300 text-sm">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-          <div>
-            <span className="font-semibold">Mock patient data:</span> Alice Chen · Age 42 ·
-            Risk Score 37/100 · Conditions: borderline hypertension · Medications: 2
-          </div>
+          <span>
+            <strong>All data is mock/synthetic — no real patient records.</strong> This is a
+            demo of Zama FHEVM on Sepolia testnet.
+          </span>
         </div>
 
-        {!CONTRACTS_DEPLOYED && (
-          <div className="p-4 rounded-lg bg-blue-500/8 border border-blue-500/25 text-blue-300 text-sm">
-            <p>
-              Contracts not yet deployed. Run{" "}
-              <code className="font-mono text-xs bg-blue-500/15 px-1 rounded">
-                npx hardhat run scripts/deploy.ts --network sepolia
-              </code>{" "}
-              then set the{" "}
-              <code className="font-mono text-xs bg-blue-500/15 px-1 rounded">
-                VITE_*_ADDRESS
-              </code>{" "}
-              env vars.
+        {!isConnected && (
+          <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-card-border">
+            <p className="text-sm text-muted-foreground">
+              Connect your wallet to manage your encrypted health record
             </p>
+            <ConnectButton />
           </div>
         )}
 
         {isConnected && (
-          <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-card border border-card-border text-sm">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-card border border-card-border text-sm">
             <div
               className={`h-2 w-2 rounded-full shrink-0 ${
                 fheLoading
@@ -202,217 +245,330 @@ export default function PatientPortal() {
                       : "bg-muted-foreground"
               }`}
             />
-            <span className="text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               {fheLoading
                 ? "Initializing Zama FHE SDK…"
                 : fheError
                   ? `FHE: ${fheError}`
                   : instance
-                    ? "FHE SDK ready — client-side encryption available"
-                    : "Wallet disconnected"}
+                    ? "FHE SDK ready — encryption runs entirely in your browser"
+                    : "FHE SDK not initialized"}
             </span>
+            {isEnrolled !== undefined && (
+              <span
+                className={`ml-auto text-xs font-medium ${isEnrolled ? "text-green-400" : "text-muted-foreground"}`}
+              >
+                {isEnrolled ? "✓ Enrolled on-chain" : "Not yet enrolled"}
+              </span>
+            )}
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-5">
-          <div className="rounded-xl bg-card border border-card-border p-6">
-            <div className="flex items-center gap-2 mb-5">
-              <User className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold text-foreground text-sm">On-Chain Status</h2>
+        {/* ──────────────────────────── SECTION A ──────────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-6 w-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary">
+              A
             </div>
-            {!isConnected ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Connect your wallet to view your enrollment status.
+            <h2 className="text-base font-semibold text-foreground">Register / Update Record</h2>
+          </div>
+
+          <div className="rounded-xl bg-card border border-card-border p-6 space-y-6">
+            <div>
+              <label className="text-sm font-medium text-foreground mb-1 block">
+                General Health Risk Score
+              </label>
+              <p className="text-xs text-muted-foreground mb-3">
+                0 = healthy, 100 = high risk
+              </p>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={riskScore}
+                  onChange={(e) => setRiskScore(Number(e.target.value))}
+                  className="flex-1 accent-primary h-2"
+                />
+                <div className="flex items-center gap-1 w-20">
+                  <span
+                    className={`text-lg font-bold tabular-nums ${
+                      riskScore < 40
+                        ? "text-green-400"
+                        : riskScore < 70
+                          ? "text-amber-400"
+                          : "text-red-400"
+                    }`}
+                  >
+                    {riskScore}
+                  </span>
+                  <span className="text-xs text-muted-foreground">/ 100</span>
+                </div>
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>Healthy</span>
+                <span>Moderate</span>
+                <span>High Risk</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground mb-3 block">
+                Medical Conditions
+              </label>
+              <div className="flex flex-wrap gap-3">
+                {CONDITIONS.map(({ label, bit }) => (
+                  <label
+                    key={label}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-sm ${
+                      conditionFlags & bit
+                        ? "border-primary/50 bg-primary/10 text-primary"
+                        : "border-border bg-muted/20 text-muted-foreground hover:border-primary/30"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!(conditionFlags & bit)}
+                      onChange={() => toggleCondition(bit)}
+                      className="accent-primary w-3.5 h-3.5"
+                    />
+                    {label}
+                  </label>
+                ))}
+                <label
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer transition-colors text-sm ${
+                    conditionFlags === 0
+                      ? "border-primary/50 bg-primary/10 text-primary"
+                      : "border-border bg-muted/20 text-muted-foreground hover:border-primary/30"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={conditionFlags === 0}
+                    onChange={() => setConditionFlags(0)}
+                    className="accent-primary w-3.5 h-3.5"
+                  />
+                  None
+                </label>
+              </div>
+              {activeConditionLabels.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Bitmask:{" "}
+                  <code className="font-mono bg-muted/50 px-1 rounded">{conditionFlags}</code>
+                  {" — "}
+                  {activeConditionLabels.join(", ")}
                 </p>
-                <ConnectButton />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">Age</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={age}
+                  onChange={(e) => setAge(Number(e.target.value))}
+                  className="text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-1 block">
+                  Medication Count
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={20}
+                    value={medCount}
+                    onChange={(e) => setMedCount(Number(e.target.value))}
+                    className="flex-1 accent-primary h-2"
+                  />
+                  <span className="text-sm font-bold text-foreground w-6 text-right tabular-nums">
+                    {medCount}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-border space-y-3">
+              <TransactionToast
+                status={txStatus}
+                encryptingMessage="Encrypting your data locally… (4 separate FHE ciphertexts)"
+                submittingMessage="Submitting to Sepolia…"
+                successMessage="✅ Encrypted record stored on-chain. Your raw data never left your device."
+                errorMessage={txError}
+              />
+
+              <Button
+                onClick={() => { void handleEncryptAndStore(); }}
+                disabled={
+                  !isConnected ||
+                  !instance ||
+                  registering ||
+                  txStatus === "encrypting" ||
+                  txStatus === "submitting" ||
+                  !CONTRACTS_DEPLOYED
+                }
+                className="w-full gap-2 h-11 text-sm font-semibold"
+                size="lg"
+              >
+                <Lock className="h-4 w-4" />
+                Encrypt & Store on Chain
+                <ChevronRight className="h-4 w-4 ml-auto" />
+              </Button>
+              {!isConnected && (
+                <p className="text-xs text-center text-muted-foreground">
+                  Connect wallet to encrypt and register
+                </p>
+              )}
+              {isConnected && !instance && !fheLoading && (
+                <p className="text-xs text-center text-muted-foreground">
+                  Switch to Sepolia to enable FHE encryption
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ──────────────────────────── SECTION B ──────────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-6 w-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary">
+              B
+            </div>
+            <h2 className="text-base font-semibold text-foreground">Authorized Providers</h2>
+          </div>
+
+          <div className="rounded-xl bg-card border border-card-border p-6 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Grant hospitals or doctors ACL access to query your encrypted record via{" "}
+              <code className="font-mono bg-muted/50 px-1 rounded">authorizeProvider()</code>.
+            </p>
+
+            <div className="flex gap-3">
+              <Input
+                placeholder="0x… provider wallet address"
+                value={providerInput}
+                onChange={(e) => setProviderInput(e.target.value)}
+                className="font-mono text-xs flex-1"
+              />
+              <Button
+                onClick={handleGrantAccess}
+                disabled={
+                  !isConnected ||
+                  !providerInput.startsWith("0x") ||
+                  granting ||
+                  !CONTRACTS_DEPLOYED
+                }
+                variant="outline"
+                className="gap-2 shrink-0"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                {granting ? "Granting…" : "Grant Access"}
+              </Button>
+            </div>
+            {grantError && (
+              <p className="text-xs text-destructive">{grantError.message.slice(0, 120)}</p>
+            )}
+
+            {providers.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground border border-dashed border-border rounded-lg">
+                No providers authorized yet
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {providers.map((p) => (
+                  <div
+                    key={p.address}
+                    className="flex items-center justify-between px-4 py-3 rounded-lg bg-muted/20 border border-border"
+                  >
+                    <div>
+                      <p className="text-xs font-mono text-foreground">{p.address}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Authorized on {p.grantedAt}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-muted-foreground gap-1.5"
+                      title="Revocation coming in v2 — requires ACL update"
+                      disabled
+                    >
+                      <Ban className="h-3 w-3" /> Revoke
+                      <span className="text-xs text-muted-foreground">(post-MVP)</span>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ──────────────────────────── SECTION C ──────────────────────────── */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-6 w-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary">
+              C
+            </div>
+            <h2 className="text-base font-semibold text-foreground">Your Policies</h2>
+          </div>
+
+          <div className="rounded-xl bg-card border border-card-border p-6">
+            {!isConnected ? (
+              <p className="text-sm text-muted-foreground">Connect wallet to view your policies.</p>
+            ) : !CONTRACTS_DEPLOYED ? (
+              <p className="text-sm text-muted-foreground">
+                Deploy contracts to see active insurance policies.
+              </p>
+            ) : !policyData || !policyData.active ? (
+              <div className="py-6 text-center space-y-2">
+                <FileText className="h-8 w-8 text-muted-foreground mx-auto opacity-40" />
+                <p className="text-sm text-muted-foreground">No active policies found.</p>
+                <p className="text-xs text-muted-foreground">
+                  An insurer can create a policy for you via the Insurance page.
+                </p>
               </div>
             ) : (
               <div className="space-y-0">
-                <div className="flex items-center justify-between py-3 border-b border-border">
-                  <span className="text-xs text-muted-foreground">Wallet</span>
-                  <span className="text-xs font-mono text-foreground">
-                    {address?.slice(0, 6)}…{address?.slice(-4)}
-                  </span>
+                <div className="flex items-center gap-2 mb-4">
+                  <CheckCircle className="h-4 w-4 text-green-400" />
+                  <span className="text-sm font-medium text-green-400">Active Policy</span>
                 </div>
-                <div className="flex items-center justify-between py-3 border-b border-border">
-                  <span className="text-xs text-muted-foreground">Enrollment</span>
-                  {!CONTRACTS_DEPLOYED ? (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  ) : isEnrolled === undefined ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                  ) : isEnrolled ? (
-                    <span className="flex items-center gap-1 text-xs text-green-400">
-                      <CheckCircle className="h-3 w-3" /> Enrolled
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <XCircle className="h-3 w-3" /> Not enrolled
-                    </span>
-                  )}
-                </div>
-                {record && (
-                  <div className="pt-3">
-                    <p className="text-xs text-muted-foreground mb-2">On-chain handles</p>
-                    {(["riskScore", "conditionFlags", "age", "medCount"] as const).map((k) => (
-                      <div key={k} className="flex items-center gap-2 py-1">
-                        <span className="text-xs text-muted-foreground w-24 shrink-0">{k}</span>
-                        <Lock className="h-3 w-3 text-primary/50 shrink-0" />
-                        <span className="text-xs font-mono text-primary/70 truncate">
-                          {String((record as Record<string, unknown>)[k]).slice(0, 14)}…
-                        </span>
-                      </div>
-                    ))}
+                {[
+                  {
+                    label: "Monthly Premium",
+                    value: `${formatEther(policyData.monthlyPremium)} ETH`,
+                  },
+                  {
+                    label: "Coverage Amount",
+                    value: `${formatEther(policyData.coverageAmount)} ETH`,
+                  },
+                  {
+                    label: "Risk Threshold",
+                    value: String(policyData.riskThreshold),
+                  },
+                ].map(({ label, value }) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between py-3 border-b border-border last:border-0"
+                  >
+                    <span className="text-xs text-muted-foreground">{label}</span>
+                    <span className="text-xs font-medium text-foreground">{value}</span>
                   </div>
-                )}
+                ))}
+                <div className="mt-3">
+                  <Button variant="ghost" size="sm" className="text-xs text-primary gap-1.5">
+                    <Activity className="h-3 w-3" /> View Claim History
+                  </Button>
+                </div>
               </div>
             )}
           </div>
-
-          <div className="rounded-xl bg-card border border-card-border p-6">
-            <div className="flex items-center gap-2 mb-5">
-              <Activity className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold text-foreground text-sm">
-                Health Snapshot{" "}
-                <span className="font-normal text-muted-foreground">(mock)</span>
-              </h2>
-            </div>
-            <div className="space-y-0">
-              {[
-                { label: "Name", value: MOCK.name, icon: User },
-                { label: "Age", value: "42 yrs", icon: User },
-                {
-                  label: "Risk Score",
-                  value: "37 / 100",
-                  icon: Activity,
-                  highlight: "text-green-400",
-                },
-                { label: "Conditions", value: "Borderline HTN (flag 0x02)", icon: Shield },
-                { label: "Medications", value: "2 active", icon: Pill },
-              ].map(({ label, value, icon: Icon, highlight }) => (
-                <div
-                  key={label}
-                  className="flex items-center justify-between py-2.5 border-b border-border last:border-0"
-                >
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{label}</span>
-                  </div>
-                  <span className={`text-xs font-medium ${highlight ?? "text-foreground"}`}>
-                    {value}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-              <Lock className="h-3 w-3" /> All values FHE-encrypted before on-chain storage
-            </p>
-          </div>
-        </div>
-
-        <div className="rounded-xl bg-card border border-card-border p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Lock className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold text-foreground text-sm">Encrypt & Register On-Chain</h2>
-          </div>
-          <p className="text-xs text-muted-foreground mb-5">
-            Calls{" "}
-            <code className="font-mono bg-muted/50 px-1 rounded">
-              PatientRegistry.registerPatient()
-            </code>{" "}
-            with four separate FHE ciphertexts, each with its own ZK proof.
-          </p>
-
-          {handles.length > 0 && (
-            <div className="mb-5 p-3 rounded-lg bg-primary/5 border border-primary/20">
-              <p className="text-xs text-muted-foreground mb-2">Generated ciphertext handles</p>
-              {(["riskScore", "conditionFlags", "age", "medCount"] as const).map((k, i) => (
-                <div key={k} className="flex items-center gap-2 py-0.5">
-                  <span className="text-xs text-muted-foreground w-28 shrink-0">{k}</span>
-                  <span className="text-xs font-mono text-primary truncate">
-                    {handles[i]?.slice(0, 24)}…
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {registerSuccess && (
-            <div className="mb-4 flex items-center gap-2 text-sm text-green-400">
-              <CheckCircle className="h-4 w-4" /> Registered on-chain!
-              <button
-                className="ml-auto text-xs text-primary underline"
-                onClick={() => { void refetchEnrolled(); }}
-              >
-                Refresh status
-              </button>
-            </div>
-          )}
-          {registerError && (
-            <p className="mb-4 text-xs text-destructive">{registerError.message.slice(0, 120)}</p>
-          )}
-
-          <Button
-            onClick={() => { void handleEncryptAndRegister(); }}
-            disabled={!canRegister || !CONTRACTS_DEPLOYED}
-            className="gap-2"
-          >
-            {encStage === "encrypting" ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Encrypting with FHE…
-              </>
-            ) : registering || registerConfirming ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Submitting tx…
-              </>
-            ) : (
-              <>
-                <Lock className="h-4 w-4" /> Encrypt & Register
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </Button>
-          {!isConnected && (
-            <p className="text-xs text-muted-foreground mt-2">Connect wallet first</p>
-          )}
-          {isConnected && !instance && !fheLoading && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Switch to Sepolia testnet to enable FHE
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-xl bg-card border border-card-border p-6">
-          <div className="flex items-center gap-2 mb-1">
-            <Shield className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold text-foreground text-sm">Authorize a Provider</h2>
-          </div>
-          <p className="text-xs text-muted-foreground mb-4">
-            Grant a hospital or doctor ACL access to query your encrypted record via{" "}
-            <code className="font-mono bg-muted/50 px-1 rounded">authorizeProvider()</code>.
-          </p>
-          <div className="flex gap-3">
-            <Input
-              placeholder="0x… provider wallet address"
-              value={providerAddr}
-              onChange={(e) => setProviderAddr(e.target.value)}
-              className="font-mono text-xs flex-1"
-            />
-            <Button
-              onClick={handleGrantAccess}
-              disabled={!isConnected || !providerAddr.startsWith("0x") || granting || !CONTRACTS_DEPLOYED}
-              variant="outline"
-              className="gap-2 shrink-0"
-            >
-              {granting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : grantSuccess ? (
-                <CheckCircle className="h-4 w-4 text-green-400" />
-              ) : null}
-              {grantSuccess ? "Authorized!" : "Authorize"}
-            </Button>
-          </div>
-        </div>
+        </section>
       </div>
     </div>
   );
