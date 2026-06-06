@@ -1,0 +1,1 @@
+- [MediFlow FHE frontend patterns](mediflow-fhevm-frontend.md) — FHEVM relayer-sdk web import, 4-proof registerPatient, non-view runEligibilityCheck

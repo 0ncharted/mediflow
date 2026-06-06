@@ -1,45 +1,60 @@
-# [Project name]
+# MediFlow
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Composable confidential health records system on Zama FHEVM v0.11 — patients store FHE-encrypted health attributes on-chain; hospitals query without seeing raw data; insurance contracts trigger payments from eligibility results only.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- **Frontend**: workflow `artifacts/mediflow-ui: web` (preview path `/mediflow-ui/`)
+- **Contracts**: `mediflow-contracts/` — standalone npm project (not in pnpm workspace)
+  - `echo 'n' | npx hardhat compile` — compile all 5 contracts
+  - `echo 'n' | npx hardhat test` — run tests (skip analytics prompt)
+  - `npx hardhat run scripts/deploy.ts --network sepolia` — deploy to Sepolia
+- `pnpm --filter @workspace/mediflow-ui exec tsc --noEmit` — typecheck frontend
+- Required env after deploy: `VITE_PATIENT_REGISTRY_ADDRESS`, `VITE_HEALTH_QUERY_ENGINE_ADDRESS`, `VITE_INSURANCE_MODULE_ADDRESS`, `VITE_RESEARCH_REGISTRY_ADDRESS`
+- Optional env: `VITE_WALLETCONNECT_PROJECT_ID` (without it: MetaMask/injected only)
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- **Frontend**: React + Vite, Tailwind CSS, shadcn/ui, wagmi v2, RainbowKit v2, viem
+- **FHE SDK**: `@zama-fhe/relayer-sdk@0.4.1` (legacy relayer SDK, web import)
+- **Contracts**: Solidity ^0.8.28, `@fhevm/solidity@0.11.1`, Hardhat TypeScript, Sepolia testnet
+- **Wallet**: RainbowKit + wagmi, publicnode RPC for Sepolia
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/mediflow-ui/` — React+Vite frontend artifact
+  - `src/lib/contracts.ts` — all 4 ABIs + VITE_*_ADDRESS env var bindings
+  - `src/lib/wagmi.ts` — wagmi config (Sepolia, publicnode RPC)
+  - `src/providers.tsx` — WagmiProvider → QueryClientProvider → RainbowKitProvider
+  - `src/hooks/useFhevm.ts` — dynamic import of FHE SDK, creates instance on Sepolia
+  - `src/pages/` — PatientPortal, HospitalQuery, InsuranceModule, ResearchRegistry
+- `mediflow-contracts/` — Hardhat project (standalone npm, NOT pnpm workspace)
+  - `contracts/PatientRegistry.sol` — stores 4 euint64 fields per patient
+  - `contracts/HealthQueryEngine.sol` — runEligibilityCheck (non-view, returns bytes32 checkId)
+  - `contracts/InsuranceModule.sol` — createPolicy + processClaimPayment
+  - `contracts/ResearchRegistry.sol` — approveInstitution + registerCohort
+  - `contracts/MockPaymentVault.sol` — simulated ETH payment escrow
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- `@zama-fhe/relayer-sdk@0.4.1` is the **legacy** SDK (not `@zama-fhe/sdk`). Import from `@zama-fhe/relayer-sdk/web` in browser code. Use `optimizeDeps.exclude` in vite config.
+- COOP/COEP headers set to `same-origin` / `credentialless` for SharedArrayBuffer (required by FHE WASM). Coinbase Base wallet shows a warning — expected trade-off.
+- Each encrypted health field needs its **own** `createEncryptedInput` + `encrypt()` call (4 proofs for 4 fields), because `registerPatient` takes 4 separate proof bytes.
+- `HealthQueryEngine.runEligibilityCheck` is **non-view** (state-changing) — it stores the encrypted result on-chain. Use `writeContract`, not `readContract`.
+- Contract addresses default to `0x000…0` when env vars are absent; `CONTRACTS_DEPLOYED` flag gates all write buttons and shows deploy banners.
+- All patient data in the frontend is MOCK data (Alice Chen, age 42, risk 37/100).
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- **Patient Portal**: encrypt mock health data with FHE, register on-chain, authorize providers
+- **Hospital Query**: run encrypted eligibility checks and aggregate cohort queries
+- **Insurance**: create risk-gated policies, process claims triggered by eligibility results
+- **Research**: approve institutions, register patient cohorts for privacy-preserving aggregate queries
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- `mediflow-contracts/` uses plain npm (not pnpm). Run `npm install` inside it, not `pnpm install`.
+- Hardhat analytics prompt will block CI — always prefix with `echo 'n' |`.
+- After deploy, set all 4 `VITE_*_ADDRESS` env vars before restarting the frontend workflow.
+- `pnpm install` at workspace root may time out silently in the Replit shell — the workflow restart handles package resolution via Vite's dep scan instead.

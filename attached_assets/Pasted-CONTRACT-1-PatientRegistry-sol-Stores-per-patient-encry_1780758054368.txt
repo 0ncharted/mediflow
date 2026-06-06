@@ -1,0 +1,29 @@
+CONTRACT 1: PatientRegistry.sol
+- Stores per-patient encrypted health attributes as euint64 values:
+  - encryptedRiskScore (0–100, where higher = higher risk)
+  - encryptedConditionFlags (a bitmask: bit 0 = diabetes, bit 1 = hypertension, bit 2 = cardiac history)
+  - encryptedAge (encrypted age in years)
+  - encryptedMedCount (number of current medications)
+- Mapping: mapping(address => PatientRecord) private records
+- PatientRecord struct: { euint64 riskScore, euint64 conditionFlags, euint64 age, euint64 medCount, bool enrolled, uint256 lastUpdated }
+- registerPatient(einput _riskScore, bytes calldata _riskProof, einput _conditionFlags, bytes calldata _flagsProof, einput _age, bytes calldata _ageProof, einput _medCount, bytes calldata _medProof) external
+  - Converts inputs using TFHE.fromExternal()
+  - Stores encrypted values
+  - Grants ACL: TFHE.allow(field, address(this)) and TFHE.allow(field, msg.sender) for each field
+- updateRiskScore(einput newScore, bytes calldata proof) external — only the patient can update their own record
+- authorizeProvider(address provider) external — patient grants a healthcare provider read-ACL on their record
+  - Calls TFHE.allow(riskScore, provider) for each field
+  - Stores mapping(address => mapping(address => bool)) public providerAuthorized
+- getPatientRecord(address patient) external view returns (PatientRecord) — only returns the struct; actual decryption happens through Zama's user-decryption flow, not here
+
+CONTRACT 2: HealthQueryEngine.sol
+- Allows authorized healthcare providers to run FHE queries against patient records WITHOUT decrypting them
+- Stores reference to PatientRegistry
+- runEligibilityCheck(address patient, uint64 maxRiskThreshold) external returns (ebool)
+  - Calls registry.getPatientRecord(patient)
+  - Computes: ebool eligible = TFHE.le(record.riskScore, TFHE.asEuint64(maxRiskThreshold))
+  - Stores result: mapping(bytes32 => ebool) private eligibilityResults where key = keccak256(patient, provider, block.timestamp)
+  - Grants ACL on result: TFHE.allow(eligible, msg.sender) and TFHE.allow(eligible, address(insuranceModule))
+  - Emits: EligibilityChecked(address indexed patient, address indexed provider, bytes32 indexed checkId) — NO health data in event
+  - CRITICAL: This function NEVER decrypts anything. The ebool result is itself encrypted.
+- runAggregateQuery(address[] calldata cohort, uint8 queryType) external returns (euint64)

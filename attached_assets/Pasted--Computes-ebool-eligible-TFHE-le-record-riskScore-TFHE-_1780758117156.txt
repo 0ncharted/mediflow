@@ -1,0 +1,24 @@
+  - Computes: ebool eligible = TFHE.le(record.riskScore, TFHE.asEuint64(maxRiskThreshold))
+  - Stores result: mapping(bytes32 => ebool) private eligibilityResults where key = keccak256(patient, provider, block.timestamp)
+  - Grants ACL on result: TFHE.allow(eligible, msg.sender) and TFHE.allow(eligible, address(insuranceModule))
+  - Emits: EligibilityChecked(address indexed patient, address indexed provider, bytes32 indexed checkId) — NO health data in event
+  - CRITICAL: This function NEVER decrypts anything. The ebool result is itself encrypted.
+- runAggregateQuery(address[] calldata cohort, uint8 queryType) external returns (euint64)
+  - queryType 0: count how many patients in cohort have riskScore > 70 (high risk count)
+  - queryType 1: count how many have conditionFlags bit 0 set (diabetes prevalence)
+  - Uses a loop with TFHE.add() and TFHE.select() to compute aggregate WITHOUT decrypting individual records
+  - This is the key FHE-only feature: aggregate computation over encrypted data
+  - Returns encrypted aggregate result (euint64)
+  - Only callable by registered research institutions
+
+CONTRACT 3: InsuranceModule.sol
+- Reads eligibility results from HealthQueryEngine and triggers confidential payments
+- Stores mapping of patient → policy: struct Policy { uint256 monthlyPremium, uint256 coverageAmount, uint64 riskThreshold, bool active }
+- createPolicy(address patient, uint256 premium, uint256 coverage, uint64 riskThreshold) external onlyInsurer
+- processClaimPayment(address patient, bytes32 eligibilityCheckId) external
+  - Reads the ebool eligibilityResult from HealthQueryEngine for that checkId
+  - Uses TFHE.select(eligibilityResult, TFHE.asEuint64(policy.coverageAmount), TFHE.asEuint64(0)) to determine payment amount — encrypted
+  - Calls into a simple MockPaymentVault that holds cUSDT and releases it
+  - Emits: ClaimProcessed(address indexed patient, bytes32 indexed checkId, uint256 timestamp) — no amount
+  - The payment amount is determined by FHE computation, not by any plaintext check
+- COMPOSABILITY NOTE: This contract is the bridge between health data and the payment layer
