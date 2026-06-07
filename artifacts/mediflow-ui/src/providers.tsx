@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider, lightTheme } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
 import { ZamaProvider, useZamaSDK } from "@zama-fhe/react-sdk";
 import { wagmiConfig } from "@/lib/wagmi";
@@ -38,11 +38,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <RelayerStatusContext.Provider value={relayerStatus}>
             <ZamaStatusBridge onReady={() => setRelayerStatus("ready")} />
             <RainbowKitProvider
-              theme={darkTheme({
-                accentColor: "hsl(184 94% 40%)",
+              theme={lightTheme({
+                accentColor: "#0b7a45",
                 accentColorForeground: "white",
                 borderRadius: "medium",
-                overlayBlur: "small",
               })}
             >
               {children}

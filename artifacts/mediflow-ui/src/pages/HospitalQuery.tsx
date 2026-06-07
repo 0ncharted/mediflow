@@ -244,7 +244,7 @@ export default function HospitalQuery() {
     },
     done: {
       label: `3/3 — ✅ Result: Patient is ${isEligible ? "ELIGIBLE" : "NOT ELIGIBLE"} for coverage at threshold ${riskThreshold}`,
-      color: isEligible ? "text-green-400" : "text-red-400",
+      color: isEligible ? "text-[#065f46]" : "text-[#991b1b]",
     },
     error: { label: checkWriteError?.message.slice(0, 120) ?? "Error", color: "text-destructive" },
   };
@@ -252,7 +252,7 @@ export default function HospitalQuery() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="max-w-[900px] mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
               <Building2 className="h-5 w-5 text-primary" />
@@ -271,9 +271,9 @@ export default function HospitalQuery() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-[900px] mx-auto px-6 py-8 space-y-6">
         {!isConnected && (
-          <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-card-border">
+          <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-card-border shadow">
             <p className="text-sm text-muted-foreground">Connect wallet to submit queries</p>
             <ConnectButton />
           </div>
@@ -287,7 +287,7 @@ export default function HospitalQuery() {
         )}
 
         {/* Eligibility Check */}
-        <div className="rounded-xl bg-card border border-card-border p-6">
+        <div className="rounded-xl bg-card border border-card-border shadow p-6">
           <div className="flex items-center gap-2 mb-1">
             <Search className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-foreground text-sm">Run Eligibility Check</h2>
@@ -327,7 +327,7 @@ export default function HospitalQuery() {
                   </Button>
                   {patientEnrolled !== undefined && (
                     <span
-                      className={`text-xs font-medium ${patientEnrolled ? "text-green-400" : "text-red-400"}`}
+                      className={`text-xs font-medium ${patientEnrolled ? "text-[#065f46]" : "text-[#991b1b]"}`}
                     >
                       {patientEnrolled
                         ? "✅ Patient is enrolled on-chain"
@@ -464,7 +464,7 @@ export default function HospitalQuery() {
                   Check ID (bytes32 — encrypted result stored on-chain)
                 </p>
                 {copied ? (
-                  <span className="flex items-center gap-1 text-green-400 font-medium">
+                  <span className="flex items-center gap-1 text-[#065f46] font-medium">
                     <ClipboardCheck className="h-3.5 w-3.5" /> Copied to clipboard!
                   </span>
                 ) : (
@@ -512,7 +512,7 @@ export default function HospitalQuery() {
 
             {checkStep === "done" && isEligible && (
               <div className="space-y-2 w-full">
-                <p className="text-xs text-green-400 font-medium">
+                <p className="text-xs text-[#065f46] font-medium">
                   Patient is eligible — submit claim payment:
                 </p>
                 <TransactionToast
@@ -539,7 +539,7 @@ export default function HospitalQuery() {
         </div>
 
         {/* Aggregate Query */}
-        <div className="rounded-xl bg-card border border-card-border p-6">
+        <div className="rounded-xl bg-card border border-card-border shadow p-6">
           <div className="flex items-center gap-2 mb-1">
             <Database className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-foreground text-sm">Aggregate Cohort Query</h2>

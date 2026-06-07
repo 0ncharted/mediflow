@@ -112,7 +112,7 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="max-w-[900px] mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
               <Settings className="h-5 w-5 text-primary" />
@@ -131,9 +131,9 @@ export default function Admin() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-[900px] mx-auto px-6 py-8 space-y-6">
         {!isConnected && (
-          <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-card-border">
+          <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-card-border shadow">
             <p className="text-sm text-muted-foreground">Connect wallet to manage the registry</p>
             <ConnectButton />
           </div>
@@ -159,7 +159,7 @@ export default function Admin() {
         )}
 
         {/* Approve Institution */}
-        <div className="rounded-xl bg-card border border-card-border p-6">
+        <div className="rounded-xl bg-card border border-card-border shadow p-6">
           <div className="flex items-center gap-2 mb-1">
             <Building2 className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-foreground text-sm">Approve Research Institution</h2>
@@ -248,7 +248,7 @@ export default function Admin() {
         </div>
 
         {/* Institutions List */}
-        <div className="rounded-xl bg-card border border-card-border p-6">
+        <div className="rounded-xl bg-card border border-card-border shadow p-6">
           <div className="flex items-center gap-2 mb-4">
             <Building2 className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-foreground text-sm">
@@ -267,7 +267,7 @@ export default function Admin() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-foreground">{inst.name}</span>
                       {inst.approved && (
-                        <span className="flex items-center gap-1 text-xs text-green-400">
+                        <span className="flex items-center gap-1 text-xs text-[#065f46]">
                           <CheckCircle className="h-3 w-3" /> Approved
                         </span>
                       )}
@@ -297,7 +297,7 @@ export default function Admin() {
         </div>
 
         {/* Transaction Log */}
-        <div className="rounded-xl bg-card border border-card-border p-6">
+        <div className="rounded-xl bg-card border border-card-border shadow p-6">
           <div className="flex items-center gap-2 mb-4">
             <Clock className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-foreground text-sm">Transaction Log</h2>
@@ -315,7 +315,7 @@ export default function Admin() {
                   className="flex items-center justify-between px-4 py-3 rounded-lg bg-muted/10 border border-border"
                 >
                   <div className="flex items-center gap-3">
-                    <CheckCircle className="h-3.5 w-3.5 text-green-400 shrink-0" />
+                    <CheckCircle className="h-3.5 w-3.5 text-[#065f46] shrink-0" />
                     <div>
                       <p className="text-xs text-foreground">{entry.label}</p>
                       <p className="text-xs font-mono text-muted-foreground/60">

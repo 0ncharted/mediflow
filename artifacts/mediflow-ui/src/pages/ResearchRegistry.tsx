@@ -167,7 +167,7 @@ export default function ResearchRegistry() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="max-w-[900px] mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
               <FlaskConical className="h-5 w-5 text-primary" />
@@ -186,9 +186,9 @@ export default function ResearchRegistry() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-[900px] mx-auto px-6 py-8 space-y-6">
         {!isConnected && (
-          <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-card-border">
+          <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-card-border shadow">
             <p className="text-sm text-muted-foreground">Connect wallet to run research queries</p>
             <ConnectButton />
           </div>
@@ -220,14 +220,14 @@ export default function ResearchRegistry() {
         )}
 
         {isConnected && CONTRACTS_DEPLOYED && isInstitutionApproved === true && (
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500/8 border border-green-500/25 text-green-500 text-xs">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#e6f4ed] border border-[#a7f3d0] text-[#065f46] text-xs">
             <CheckCircle className="h-3.5 w-3.5 shrink-0" />
             Your wallet is an approved research institution.
           </div>
         )}
 
         {/* Query Panel */}
-        <div className="rounded-xl bg-card border border-card-border p-6">
+        <div className="rounded-xl bg-card border border-card-border shadow p-6">
           <div className="flex items-center gap-2 mb-1">
             <FlaskConical className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-foreground text-sm">Run Aggregate Query</h2>
@@ -377,10 +377,10 @@ export default function ResearchRegistry() {
 
           {/* Result */}
           {currentResult && (
-            <div className="mb-5 rounded-xl border border-green-500/30 bg-green-500/5 p-5 space-y-3">
+            <div className="mb-5 rounded-xl border border-[#a7f3d0] bg-[#e6f4ed] p-5 space-y-3">
               <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-400" />
-                <span className="text-sm font-semibold text-green-400">
+                <CheckCircle className="h-4 w-4 text-[#065f46]" />
+                <span className="text-sm font-semibold text-[#065f46]">
                   FHE Computation Complete
                 </span>
               </div>
@@ -419,7 +419,7 @@ export default function ResearchRegistry() {
 
         {/* Query History */}
         {queryHistory.length > 0 && (
-          <div className="rounded-xl bg-card border border-card-border p-6">
+          <div className="rounded-xl bg-card border border-card-border shadow p-6">
             <div className="flex items-center gap-2 mb-4">
               <FlaskConical className="h-4 w-4 text-primary" />
               <h2 className="font-semibold text-foreground text-sm">Query History</h2>
@@ -454,7 +454,7 @@ export default function ResearchRegistry() {
         )}
 
         {/* Register Cohort */}
-        <div className="rounded-xl bg-card border border-card-border p-6">
+        <div className="rounded-xl bg-card border border-card-border shadow p-6">
           <div className="flex items-center gap-2 mb-1">
             <Users className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-foreground text-sm">Register a New Cohort</h2>

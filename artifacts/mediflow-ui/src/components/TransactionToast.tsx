@@ -22,9 +22,9 @@ export function FheCountdown({ running }: { running: boolean }) {
       <p className="text-xs font-mono tabular-nums">
         FHE computation in progress: {elapsed}s / ~45s expected
       </p>
-      <div className="h-1 w-full rounded-full bg-amber-500/20 overflow-hidden">
+      <div className="h-1 w-full rounded-full bg-[#fde68a] overflow-hidden">
         <div
-          className="h-full rounded-full bg-amber-400 transition-all duration-1000"
+          className="h-full rounded-full bg-[#92400e] transition-all duration-1000"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -54,29 +54,29 @@ export function TransactionToast({
   const variants = {
     encrypting: {
       Icon: Lock,
-      color: "text-primary",
-      bg: "bg-primary/10 border-primary/30",
+      color: "text-[#065f46]",
+      bg: "bg-[#f0fdf4] border-[#bbf7d0]",
       label: encryptingMessage,
       spin: false,
     },
     submitting: {
       Icon: Loader2,
-      color: "text-amber-400",
-      bg: "bg-amber-500/10 border-amber-500/30",
+      color: "text-[#92400e]",
+      bg: "bg-[#fffbeb] border-[#fde68a]",
       label: submittingMessage,
       spin: true,
     },
     success: {
       Icon: CheckCircle,
-      color: "text-green-400",
-      bg: "bg-green-500/10 border-green-500/30",
+      color: "text-[#065f46]",
+      bg: "bg-[#e6f4ed] border-[#a7f3d0]",
       label: successMessage,
       spin: false,
     },
     error: {
       Icon: XCircle,
-      color: "text-destructive",
-      bg: "bg-destructive/10 border-destructive/30",
+      color: "text-[#991b1b]",
+      bg: "bg-[#fef2f2] border-[#fecaca]",
       label: errorMessage ?? "Transaction failed",
       spin: false,
     },

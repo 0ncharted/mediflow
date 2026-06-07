@@ -294,7 +294,7 @@ export default function PatientPortal() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="max-w-[900px] mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
               <Shield className="h-5 w-5 text-primary" />
@@ -318,7 +318,7 @@ export default function PatientPortal() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+      <div className="max-w-[900px] mx-auto px-6 py-8 space-y-8">
         <div className="flex items-start gap-2 p-4 rounded-lg bg-amber-500/8 border border-amber-500/25 text-amber-300 text-sm">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
           <span>
@@ -328,7 +328,7 @@ export default function PatientPortal() {
         </div>
 
         {!isConnected && (
-          <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-card-border">
+          <div className="flex items-center justify-between p-5 rounded-xl bg-card border border-card-border shadow">
             <p className="text-sm text-muted-foreground">
               Connect your wallet to manage your encrypted health record
             </p>
@@ -342,7 +342,7 @@ export default function PatientPortal() {
             <span className="text-muted-foreground text-xs">{fheStatusText}</span>
             {isEnrolled !== undefined && (
               <span
-                className={`ml-auto text-xs font-medium ${isEnrolled ? "text-green-400" : "text-muted-foreground"}`}
+                className={`ml-auto text-xs font-medium ${isEnrolled ? "text-[#065f46]" : "text-muted-foreground"}`}
               >
                 {isEnrolled ? "✓ Enrolled on-chain" : "Not yet enrolled"}
               </span>
@@ -359,7 +359,7 @@ export default function PatientPortal() {
             <h2 className="text-base font-semibold text-foreground">Register / Update Record</h2>
           </div>
 
-          <div className="rounded-xl bg-card border border-card-border p-6 space-y-6">
+          <div className="rounded-xl bg-card border border-card-border shadow p-6 space-y-6">
             <div>
               <label className="text-sm font-medium text-foreground mb-1 block">
                 General Health Risk Score
@@ -378,7 +378,7 @@ export default function PatientPortal() {
                   <span
                     className={`text-lg font-bold tabular-nums ${
                       riskScore < 40
-                        ? "text-green-400"
+                        ? "text-[#065f46]"
                         : riskScore < 70
                           ? "text-amber-400"
                           : "text-red-400"
@@ -526,7 +526,7 @@ export default function PatientPortal() {
             <h2 className="text-base font-semibold text-foreground">Authorized Providers</h2>
           </div>
 
-          <div className="rounded-xl bg-card border border-card-border p-6 space-y-4">
+          <div className="rounded-xl bg-card border border-card-border shadow p-6 space-y-4">
             <p className="text-xs text-muted-foreground">
               Grant hospitals or doctors ACL access to query your encrypted record via{" "}
               <code className="font-mono bg-muted/50 px-1 rounded">authorizeProvider()</code>.
@@ -601,7 +601,7 @@ export default function PatientPortal() {
             <h2 className="text-base font-semibold text-foreground">Delegated Decryption</h2>
           </div>
 
-          <div className="rounded-xl bg-card border border-card-border p-6 space-y-4">
+          <div className="rounded-xl bg-card border border-card-border shadow p-6 space-y-4">
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">
                 Grant a regulator, auditor, or research institution the ability to decrypt{" "}
@@ -714,7 +714,7 @@ export default function PatientPortal() {
             <h2 className="text-base font-semibold text-foreground">Your Policies</h2>
           </div>
 
-          <div className="rounded-xl bg-card border border-card-border p-6">
+          <div className="rounded-xl bg-card border border-card-border shadow p-6">
             {!isConnected ? (
               <p className="text-sm text-muted-foreground">Connect wallet to view your policies.</p>
             ) : !CONTRACTS_DEPLOYED ? (
@@ -732,8 +732,8 @@ export default function PatientPortal() {
             ) : (
               <div className="space-y-0">
                 <div className="flex items-center gap-2 mb-4">
-                  <CheckCircle className="h-4 w-4 text-green-400" />
-                  <span className="text-sm font-medium text-green-400">Active Policy</span>
+                  <CheckCircle className="h-4 w-4 text-[#065f46]" />
+                  <span className="text-sm font-medium text-[#065f46]">Active Policy</span>
                 </div>
                 {[
                   {

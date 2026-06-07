@@ -40,7 +40,7 @@ export default function Sidebar() {
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
                 isActive
                   ? "bg-[#0b7a45] text-white font-medium"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+                  : "text-gray-400 hover:text-white hover:bg-white/8"
               }`}
             >
               <span className="text-base leading-none select-none">{emoji}</span>
@@ -52,12 +52,9 @@ export default function Sidebar() {
 
       {/* FHE Status + Wallet */}
       <div className="px-4 pb-5 pt-3 border-t border-white/10 space-y-3">
-        <div className="flex items-center gap-2">
-          <RelayerDot />
-          <span className="text-xs text-gray-500">Zama FHE Relayer</span>
-        </div>
+        <RelayerDot />
         <ConnectButton chainStatus="icon" showBalance={false} />
-        <p className="text-xs text-gray-600">FHEVM v0.11 · Sepolia</p>
+        <p className="text-xs text-gray-600">FHEVM v0.11 · Sepolia Testnet</p>
       </div>
     </aside>
   );

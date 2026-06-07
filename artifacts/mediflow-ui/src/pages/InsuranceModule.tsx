@@ -177,7 +177,7 @@ export default function InsuranceModule() {
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b border-border bg-white">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="max-w-[900px] mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
               <FileText className="h-5 w-5 text-primary" />
@@ -196,9 +196,9 @@ export default function InsuranceModule() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-5">
+      <div className="max-w-[900px] mx-auto px-6 py-8 space-y-5">
         {!isConnected && (
-          <div className="flex items-center justify-between p-4 rounded-xl bg-card border border-card-border">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-card border border-card-border shadow">
             <p className="text-sm text-muted-foreground">Connect wallet to manage policies</p>
             <ConnectButton />
           </div>
@@ -242,7 +242,7 @@ export default function InsuranceModule() {
         )}
 
         <div className="grid md:grid-cols-2 gap-5">
-          <div className="rounded-xl bg-card border border-card-border p-6">
+          <div className="rounded-xl bg-card border border-card-border shadow p-6">
             <div className="flex items-center gap-2 mb-1">
               <Shield className="h-4 w-4 text-primary" />
               <h2 className="font-semibold text-foreground text-sm">Create Policy</h2>
@@ -314,7 +314,7 @@ export default function InsuranceModule() {
             </div>
 
             {policySuccess && (
-              <div className="mt-4 flex items-center gap-2 text-sm text-green-400">
+              <div className="mt-4 flex items-center gap-2 text-sm text-[#065f46]">
                 <CheckCircle className="h-4 w-4" /> Policy created on-chain
               </div>
             )}
@@ -343,7 +343,7 @@ export default function InsuranceModule() {
             </Button>
           </div>
 
-          <div className="rounded-xl bg-card border border-card-border p-6">
+          <div className="rounded-xl bg-card border border-card-border shadow p-6">
             <div className="flex items-center gap-2 mb-1">
               <DollarSign className="h-4 w-4 text-primary" />
               <h2 className="font-semibold text-foreground text-sm">Process Claim Payment</h2>
@@ -405,7 +405,7 @@ export default function InsuranceModule() {
               {claimProcessed !== undefined && (
                 <div className="flex items-center gap-2 text-xs">
                   {claimProcessed ? (
-                    <span className="flex items-center gap-1 text-green-400">
+                    <span className="flex items-center gap-1 text-[#065f46]">
                       <CheckCircle className="h-3 w-3" /> Claim already processed
                     </span>
                   ) : (
@@ -416,7 +416,7 @@ export default function InsuranceModule() {
             </div>
 
             {claimSuccess && (
-              <div className="mt-4 flex items-center gap-2 text-sm text-green-400">
+              <div className="mt-4 flex items-center gap-2 text-sm text-[#065f46]">
                 <CheckCircle className="h-4 w-4" /> Claim payment processed
               </div>
             )}
@@ -447,7 +447,7 @@ export default function InsuranceModule() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-card border border-card-border p-6">
+        <div className="rounded-xl bg-card border border-card-border shadow p-6">
           <div className="flex items-center gap-2 mb-1">
             <FileText className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-foreground text-sm">View Policy</h2>
@@ -481,7 +481,7 @@ export default function InsuranceModule() {
                 {
                   label: "Status",
                   value: policyData.active ? "Active" : "Inactive",
-                  highlight: policyData.active ? "text-green-400" : "text-muted-foreground",
+                  highlight: policyData.active ? "text-[#065f46]" : "text-muted-foreground",
                 },
               ].map(({ label, value, highlight }) => (
                 <div key={label} className="flex items-center justify-between px-4 py-3">
