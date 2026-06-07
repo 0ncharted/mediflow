@@ -8,7 +8,7 @@ import {
 } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { bytesToHex, formatEther } from "viem";
+import { bytesToHex, formatEther, isAddress } from "viem";
 import { useEncrypt } from "@zama-fhe/react-sdk";
 import { useRelayerStatus } from "@/providers";
 import {
@@ -239,7 +239,7 @@ export default function PatientPortal() {
   };
 
   const handleGrantDelegatedAccess = () => {
-    if (!delegateAddr.startsWith("0x")) return;
+    if (!isAddress(delegateAddr)) return;
     const fieldLabel = FIELDS[selectedFieldIndex]?.label ?? "Unknown";
     setLastDelegateAddr(delegateAddr);
     setLastDelegateField(fieldLabel);
@@ -285,9 +285,15 @@ export default function PatientPortal() {
             ? "FHE SDK error — check console"
             : "FHE SDK ready — encryption runs entirely in your browser";
 
+  const isValidDelegateAddr = delegateAddr.length > 0 && isAddress(delegateAddr);
+  const delegateAddrError =
+    delegateAddr.length > 0 && !isValidDelegateAddr
+      ? "Must be a valid 42-character Ethereum address (0x + 40 hex digits)"
+      : null;
+
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-background">
-      <div className="border-b border-border bg-card/40">
+    <div className="min-h-screen bg-background">
+      <div className="border-b border-border bg-white">
         <div className="max-w-5xl mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -602,7 +608,7 @@ export default function PatientPortal() {
                 <strong>one specific field</strong> of your record — not the whole record. This
                 calls{" "}
                 <code className="font-mono bg-muted/50 px-1 rounded">
-                  TFHE.allow(encryptedField, grantee)
+                  FHE.allow(encryptedField, grantee)
                 </code>{" "}
                 on-chain for only the selected ciphertext.
               </p>
@@ -611,14 +617,20 @@ export default function PatientPortal() {
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">
-                  Grantee address (auditor / regulator)
+                  Grantee wallet address — the wallet of the auditor, regulator, or institution
                 </label>
                 <Input
-                  placeholder="0x… grantee wallet"
+                  placeholder="0x… (42-character Ethereum address)"
                   value={delegateAddr}
                   onChange={(e) => setDelegateAddr(e.target.value)}
-                  className="font-mono text-xs"
+                  className={`font-mono text-xs ${delegateAddrError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
+                {delegateAddrError && (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-destructive">
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    {delegateAddrError}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Field</label>
@@ -638,7 +650,7 @@ export default function PatientPortal() {
                 onClick={handleGrantDelegatedAccess}
                 disabled={
                   !isConnected ||
-                  !delegateAddr.startsWith("0x") ||
+                  !isValidDelegateAddr ||
                   delegating ||
                   !CONTRACTS_DEPLOYED
                 }
@@ -661,7 +673,7 @@ export default function PatientPortal() {
                   Patient calls <code className="font-mono">grantDelegatedFieldAccess(grantee, fieldIndex)</code>
                 </li>
                 <li>
-                  Contract calls <code className="font-mono">TFHE.allow(patient.fields[fieldIndex], grantee)</code>
+                  Contract calls <code className="font-mono">FHE.allow(patient.fields[fieldIndex], grantee)</code>
                 </li>
                 <li>Grantee can now request KMS decryption of that single handle only</li>
                 <li>All other fields remain inaccessible to the grantee</li>

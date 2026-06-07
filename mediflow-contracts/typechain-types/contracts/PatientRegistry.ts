@@ -57,6 +57,7 @@ export interface PatientRegistryInterface extends Interface {
       | "checkRiskScoreACL"
       | "confidentialProtocolId"
       | "getPatientRecord"
+      | "grantDelegatedFieldAccess"
       | "isEnrolled"
       | "providerAuthorized"
       | "queryEngineAddress"
@@ -67,6 +68,7 @@ export interface PatientRegistryInterface extends Interface {
 
   getEvent(
     nameOrSignatureOrTopic:
+      | "FieldAccessDelegated"
       | "PatientRegistered"
       | "ProviderAuthorized"
       | "QueryEngineSet"
@@ -88,6 +90,10 @@ export interface PatientRegistryInterface extends Interface {
   encodeFunctionData(
     functionFragment: "getPatientRecord",
     values: [AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "grantDelegatedFieldAccess",
+    values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "isEnrolled",
@@ -139,6 +145,10 @@ export interface PatientRegistryInterface extends Interface {
     functionFragment: "getPatientRecord",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "grantDelegatedFieldAccess",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "isEnrolled", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "providerAuthorized",
@@ -160,6 +170,28 @@ export interface PatientRegistryInterface extends Interface {
     functionFragment: "updateRiskScore",
     data: BytesLike
   ): Result;
+}
+
+export namespace FieldAccessDelegatedEvent {
+  export type InputTuple = [
+    patient: AddressLike,
+    grantee: AddressLike,
+    fieldIndex: BigNumberish
+  ];
+  export type OutputTuple = [
+    patient: string,
+    grantee: string,
+    fieldIndex: bigint
+  ];
+  export interface OutputObject {
+    patient: string;
+    grantee: string;
+    fieldIndex: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
 
 export namespace PatientRegisteredEvent {
@@ -276,6 +308,12 @@ export interface PatientRegistry extends BaseContract {
     "view"
   >;
 
+  grantDelegatedFieldAccess: TypedContractMethod<
+    [grantee: AddressLike, fieldIndex: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
   isEnrolled: TypedContractMethod<[patient: AddressLike], [boolean], "view">;
 
   providerAuthorized: TypedContractMethod<
@@ -338,6 +376,13 @@ export interface PatientRegistry extends BaseContract {
     "view"
   >;
   getFunction(
+    nameOrSignature: "grantDelegatedFieldAccess"
+  ): TypedContractMethod<
+    [grantee: AddressLike, fieldIndex: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "isEnrolled"
   ): TypedContractMethod<[patient: AddressLike], [boolean], "view">;
   getFunction(
@@ -378,6 +423,13 @@ export interface PatientRegistry extends BaseContract {
   >;
 
   getEvent(
+    key: "FieldAccessDelegated"
+  ): TypedContractEvent<
+    FieldAccessDelegatedEvent.InputTuple,
+    FieldAccessDelegatedEvent.OutputTuple,
+    FieldAccessDelegatedEvent.OutputObject
+  >;
+  getEvent(
     key: "PatientRegistered"
   ): TypedContractEvent<
     PatientRegisteredEvent.InputTuple,
@@ -407,6 +459,17 @@ export interface PatientRegistry extends BaseContract {
   >;
 
   filters: {
+    "FieldAccessDelegated(address,address,uint8)": TypedContractEvent<
+      FieldAccessDelegatedEvent.InputTuple,
+      FieldAccessDelegatedEvent.OutputTuple,
+      FieldAccessDelegatedEvent.OutputObject
+    >;
+    FieldAccessDelegated: TypedContractEvent<
+      FieldAccessDelegatedEvent.InputTuple,
+      FieldAccessDelegatedEvent.OutputTuple,
+      FieldAccessDelegatedEvent.OutputObject
+    >;
+
     "PatientRegistered(address,uint256)": TypedContractEvent<
       PatientRegisteredEvent.InputTuple,
       PatientRegisteredEvent.OutputTuple,

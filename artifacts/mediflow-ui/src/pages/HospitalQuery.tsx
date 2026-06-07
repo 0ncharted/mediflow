@@ -59,8 +59,10 @@ export default function HospitalQuery() {
   const [cohortText, setCohortText] = useState("");
   const [queryType, setQueryType] = useState<"0" | "1">("0");
   const [aggTxStatus, setAggTxStatus] = useState<TxStatus>("idle");
+  const [aggTimedOut, setAggTimedOut] = useState(false);
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aggTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isValidPatientAddr = patientAddr.startsWith("0x") && patientAddr.length === 42;
 
@@ -129,13 +131,22 @@ export default function HospitalQuery() {
       setCheckStep("done");
       setCheckId(checkHash ?? null);
       if (checkHash) {
+        localStorage.setItem(
+          "mediflow_last_check",
+          JSON.stringify({
+            checkId: checkHash,
+            patient: patientAddr,
+            threshold: riskThreshold,
+            timestamp: Date.now(),
+          }),
+        );
         void navigator.clipboard.writeText(checkHash).catch(() => {});
         setCopied(true);
         setTimeout(() => setCopied(false), 4000);
         addEntry("Run Eligibility Check", "success", checkHash);
       }
     }
-  }, [checkSuccess, checkHash, addEntry]);
+  }, [checkSuccess, checkHash, patientAddr, riskThreshold, addEntry]);
 
   useEffect(() => {
     if (checkWriteError && checkStep !== "idle") {
@@ -147,6 +158,8 @@ export default function HospitalQuery() {
 
   useEffect(() => {
     if (aggSuccess) {
+      if (aggTimeoutRef.current) clearTimeout(aggTimeoutRef.current);
+      setAggTimedOut(false);
       setAggTxStatus("success");
       addEntry("Run Aggregate Query", "success", aggHash);
     } else if (aggPending || aggConfirming) {
@@ -169,6 +182,7 @@ export default function HospitalQuery() {
   useEffect(() => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (aggTimeoutRef.current) clearTimeout(aggTimeoutRef.current);
     };
   }, []);
 
@@ -192,7 +206,10 @@ export default function HospitalQuery() {
       .map((s) => s.trim())
       .filter((s) => s.startsWith("0x") && s.length === 42) as `0x${string}`[];
     if (addrs.length === 0) return;
+    setAggTimedOut(false);
     setAggTxStatus("submitting");
+    if (aggTimeoutRef.current) clearTimeout(aggTimeoutRef.current);
+    aggTimeoutRef.current = setTimeout(() => setAggTimedOut(true), 120_000);
     runAggregate({
       address: HEALTH_QUERY_ENGINE_ADDRESS,
       abi: HEALTH_QUERY_ENGINE_ABI,
@@ -233,8 +250,8 @@ export default function HospitalQuery() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-background">
-      <div className="border-b border-border bg-card/40">
+    <div className="min-h-screen bg-background">
+      <div className="border-b border-border bg-white">
         <div className="max-w-5xl mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -585,6 +602,27 @@ export default function HospitalQuery() {
             successMessage="✅ Aggregate query submitted — encrypted result stored on-chain."
             showFheTimer
           />
+
+          {aggTimedOut && (aggPending || aggConfirming) && aggHash && (
+            <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-amber-500/8 border border-amber-500/30 text-amber-400 text-xs">
+              <span className="text-base leading-none">⏱️</span>
+              <div>
+                <p className="font-medium">Aggregate query is taking longer than expected (120 s elapsed).</p>
+                <p className="mt-0.5 text-amber-400/70">
+                  The transaction was submitted — you can track it on Etherscan while the FHE
+                  coprocessor processes the cohort.
+                </p>
+                <a
+                  href={`https://sepolia.etherscan.io/tx/${aggHash}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 mt-1.5 text-amber-300 hover:underline font-mono"
+                >
+                  {aggHash.slice(0, 18)}…
+                </a>
+              </div>
+            </div>
+          )}
 
           <Button
             onClick={handleRunAggregate}

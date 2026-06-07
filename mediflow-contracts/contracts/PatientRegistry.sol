@@ -73,6 +73,9 @@ contract PatientRegistry is ZamaEthereumConfig {
     /** @notice Emitted when a patient updates their encrypted risk score. */
     event RiskScoreUpdated(address indexed patient, uint256 indexed timestamp);
 
+    /** @notice Emitted when a patient grants a specific field to a single grantee. */
+    event FieldAccessDelegated(address indexed patient, address indexed grantee, uint8 fieldIndex);
+
     /** @notice Emitted when the owner updates the query engine address. */
     event QueryEngineSet(address indexed queryEngine);
 
@@ -228,6 +231,34 @@ contract PatientRegistry is ZamaEthereumConfig {
         providerAuthorized[msg.sender][provider] = true;
 
         emit ProviderAuthorized(msg.sender, provider);
+    }
+
+    /**
+     * @notice Grant a single encrypted field to a specific grantee (auditor, regulator, institution).
+     * @dev FHE.allow modifies ACL contract state; this function cannot be view.
+     *      fieldIndex mapping: 0 = riskScore, 1 = conditionFlags, 2 = age, 3 = medCount.
+     *      Unlike authorizeProvider (all-fields), this grants access to exactly one field.
+     * @param grantee    Address of the grantee wallet or contract to receive read-ACL.
+     * @param fieldIndex Index of the field to grant (0–3). Reverts on out-of-range.
+     */
+    function grantDelegatedFieldAccess(address grantee, uint8 fieldIndex) external {
+        require(_records[msg.sender].enrolled, "Not enrolled");
+        require(grantee != address(0), "Invalid grantee");
+
+        PatientRecord storage r = _records[msg.sender];
+        if (fieldIndex == 0) {
+            FHE.allow(r.riskScore, grantee);
+        } else if (fieldIndex == 1) {
+            FHE.allow(r.conditionFlags, grantee);
+        } else if (fieldIndex == 2) {
+            FHE.allow(r.age, grantee);
+        } else if (fieldIndex == 3) {
+            FHE.allow(r.medCount, grantee);
+        } else {
+            revert("Invalid field index");
+        }
+
+        emit FieldAccessDelegated(msg.sender, grantee, fieldIndex);
     }
 
     /**

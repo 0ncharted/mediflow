@@ -2,7 +2,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Providers } from "@/providers";
-import Nav from "@/components/Nav";
+import Sidebar from "@/components/Sidebar";
 import PatientPortal from "@/pages/PatientPortal";
 import HospitalQuery from "@/pages/HospitalQuery";
 import InsuranceModule from "@/pages/InsuranceModule";
@@ -27,13 +27,15 @@ function App() {
   return (
     <Providers>
       <TooltipProvider>
-        <div className="dark min-h-screen bg-background text-foreground">
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Nav />
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </div>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <div className="min-h-screen flex bg-background text-foreground">
+            <Sidebar />
+            <main className="flex-1 min-w-0 overflow-auto">
+              <Router />
+            </main>
+          </div>
+        </WouterRouter>
+        <Toaster />
       </TooltipProvider>
     </Providers>
   );

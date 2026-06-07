@@ -110,8 +110,8 @@ export default function Admin() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-background">
-      <div className="border-b border-border bg-card/40">
+    <div className="min-h-screen bg-background">
+      <div className="border-b border-border bg-white">
         <div className="max-w-5xl mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -184,6 +184,15 @@ export default function Admin() {
                 onChange={(e) => setInstAddress(e.target.value)}
                 className="font-mono text-xs"
               />
+              {isConnected && address && (
+                <button
+                  type="button"
+                  onClick={() => setInstAddress(address)}
+                  className="mt-1.5 text-xs text-primary hover:underline flex items-center gap-1"
+                >
+                  ← Use my connected wallet address
+                </button>
+              )}
             </div>
             <div className="grid md:grid-cols-2 gap-3">
               <div>

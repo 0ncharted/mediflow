@@ -1,0 +1,55 @@
+════════════════════════════════════════
+FIX 5 — Cohort data source clarification + real cohort registration
+════════════════════════════════════════
+
+The cohort data showing hardcoded Hardhat addresses 
+(0xf39Fd6, 0x709979 etc.) is mock data from the seed script 
+that used local Hardhat accounts. These are NOT real Sepolia 
+wallets.
+
+Fix this:
+A) In the Research page, replace the hardcoded cohort display 
+   with on-chain data. Read cohorts from ResearchRegistry 
+   using getCohortMembers(cohortId).
+B) Add a "Create New Cohort" form that takes:
+   - Cohort name (text)
+   - Patient addresses (textarea, one per line)
+   - Calls researchRegistry.registerCohort(name, addresses[])
+   - Requires institution approval first (show warning if not)
+C) Add a note above the cohort list: 
+   "Cohort A and B below use demo addresses from local 
+   testing. Register real patient addresses using the form 
+   above to run actual on-chain queries."
+
+════════════════════════════════════════
+FIX 6 — Perpetual spinner with no timeout on eligibility and aggregate
+════════════════════════════════════════
+
+Both eligibility check and aggregate query can spin forever.
+
+For BOTH flows, add this pattern after submitting the transaction:
+
+const TIMEOUT_MS = 120_000 // 2 minutes
+
+const result = await Promise.race([
+  waitForResult(txHash),
+  new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS)
+  )
+])
+
+If timeout fires, show:
+"⏱️ The FHE computation is taking longer than expected.
+Your transaction was submitted: [Etherscan link]
+The result may still arrive on-chain — check back in a few minutes.
+You can also verify directly on Etherscan."
+
+Always show the Etherscan link regardless of timeout.
+
+════════════════════════════════════════
+FIX 7 — Complete UI redesign to match Covalent's mature style
+════════════════════════════════════════
+
+Redesign MediFlow's visual style to match Covalent's approach:
+white background, green accent color, sidebar navigation 
+(not top tabs), clean card-based layout, professional feel

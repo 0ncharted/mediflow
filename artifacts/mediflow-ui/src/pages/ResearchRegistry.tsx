@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { keccak256, toBytes } from "viem";
 import {
@@ -12,6 +12,8 @@ import { TxHistoryPanel } from "@/components/TxHistoryPanel";
 import { useTxHistory } from "@/hooks/useTxHistory";
 import { Button } from "@/components/ui/button";
 import { FlaskConical, Users, CheckCircle, Loader2, AlertTriangle, Info } from "lucide-react";
+
+const NULL_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
 const HARDHAT_ACCOUNTS = [
   "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
@@ -99,6 +101,14 @@ export default function ResearchRegistry() {
   } = useWriteContract();
   const { isSuccess: cohortSuccess } = useWaitForTransactionReceipt({ hash: cohortHash });
 
+  const { data: isInstitutionApproved } = useReadContract({
+    address: RESEARCH_REGISTRY_ADDRESS,
+    abi: RESEARCH_REGISTRY_ABI,
+    functionName: "isApproved",
+    args: [address ?? NULL_ADDR],
+    query: { enabled: isConnected && CONTRACTS_DEPLOYED },
+  });
+
   useEffect(() => {
     if (cohortSuccess) {
       setRegisterTxStatus("success");
@@ -155,8 +165,8 @@ export default function ResearchRegistry() {
     computeStep === "done" ? QUERY_RESULTS[`${cohort}-${queryType}` as QueryResultKey] : null;
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-background">
-      <div className="border-b border-border bg-card/40">
+    <div className="min-h-screen bg-background">
+      <div className="border-b border-border bg-white">
         <div className="max-w-5xl mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -185,11 +195,34 @@ export default function ResearchRegistry() {
         )}
 
         {!CONTRACTS_DEPLOYED && (
-          <div className="flex items-start gap-2 p-4 rounded-lg bg-blue-500/8 border border-blue-500/25 text-blue-300 text-sm">
+          <div className="flex items-start gap-2 p-4 rounded-lg bg-blue-500/8 border border-blue-500/25 text-blue-400 text-sm">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
               Contracts not yet deployed. Query results shown below are from mock seed data.
             </span>
+          </div>
+        )}
+
+        {/* FIX 3 — Institution approval check */}
+        {isConnected && CONTRACTS_DEPLOYED && isInstitutionApproved === false && (
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/8 border border-amber-500/25 text-amber-500 text-sm">
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium">Your wallet is not an approved research institution.</p>
+              <p className="text-xs mt-1 text-amber-500/70">
+                Ask the registry owner to call{" "}
+                <code className="font-mono">approveInstitution()</code> with your wallet address
+                via the Admin page before you can register cohorts on-chain. You can still run
+                preview queries below.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isConnected && CONTRACTS_DEPLOYED && isInstitutionApproved === true && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500/8 border border-green-500/25 text-green-500 text-xs">
+            <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+            Your wallet is an approved research institution.
           </div>
         )}
 
@@ -203,6 +236,17 @@ export default function ResearchRegistry() {
             Select a pre-seeded cohort and query type. The FHE coprocessor sums the encrypted
             attribute across all cohort members — no individual value is ever decrypted.
           </p>
+
+          {/* FIX 5 — Demo cohort note */}
+          <div className="mb-5 flex items-start gap-2 p-3 rounded-lg bg-blue-500/8 border border-blue-500/20 text-blue-400 text-xs">
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <p>
+              <strong>Demo cohorts</strong> — addresses shown below are Hardhat local-node test
+              accounts included to simulate a populated registry. They are not real patient
+              wallets. Use the "Register a New Cohort" form below to add actual on-chain patient
+              addresses.
+            </p>
+          </div>
 
           <div className="grid md:grid-cols-2 gap-5 mb-5">
             <div>
@@ -480,7 +524,6 @@ export default function ResearchRegistry() {
           </Button>
         </div>
 
-        {/* Fix 3 — Transaction History */}
         <TxHistoryPanel entries={entries} onClear={clearHistory} />
       </div>
     </div>

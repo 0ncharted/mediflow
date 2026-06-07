@@ -25,6 +25,7 @@ import {
   Shield,
   DollarSign,
   Info,
+  ClipboardList,
 } from "lucide-react";
 
 const NULL_ADDR = "0x0000000000000000000000000000000000000000" as const;
@@ -32,6 +33,13 @@ const NULL_BYTES32 =
   "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
 
 const CHECK_ID_REGEX = /^0x[0-9a-fA-F]{64}$/;
+
+interface LastCheck {
+  checkId: string;
+  patient: string;
+  threshold: number;
+  timestamp: number;
+}
 
 export default function InsuranceModule() {
   const { isConnected } = useAccount();
@@ -46,6 +54,20 @@ export default function InsuranceModule() {
   const [checkId, setCheckId] = useState("");
 
   const [viewPatient, setViewPatient] = useState("");
+
+  const [lastCheck, setLastCheck] = useState<LastCheck | null>(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("mediflow_last_check");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as LastCheck;
+        if (parsed.checkId && parsed.patient) setLastCheck(parsed);
+      } catch {
+        /* ignore malformed JSON */
+      }
+    }
+  }, []);
 
   const {
     writeContract: createPolicy,
@@ -117,6 +139,12 @@ export default function InsuranceModule() {
       ? "Must be a 66-character hex string (0x followed by 64 hex digits)"
       : null;
 
+  const patientMismatch =
+    lastCheck &&
+    claimPatient.length === 42 &&
+    checkIdValid &&
+    lastCheck.patient.toLowerCase() !== claimPatient.toLowerCase();
+
   const handleCreatePolicy = () => {
     if (!policyPatient.startsWith("0x")) return;
     createPolicy({
@@ -147,8 +175,8 @@ export default function InsuranceModule() {
     | undefined;
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-background">
-      <div className="border-b border-border bg-card/40">
+    <div className="min-h-screen bg-background">
+      <div className="border-b border-border bg-white">
         <div className="max-w-5xl mx-auto px-6 py-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
@@ -177,9 +205,39 @@ export default function InsuranceModule() {
         )}
 
         {!CONTRACTS_DEPLOYED && (
-          <div className="flex items-start gap-2 p-4 rounded-lg bg-blue-500/8 border border-blue-500/25 text-blue-300 text-sm">
+          <div className="flex items-start gap-2 p-4 rounded-lg bg-blue-500/8 border border-blue-500/25 text-blue-400 text-sm">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
             <span>Deploy contracts first. Interface shown for preview.</span>
+          </div>
+        )}
+
+        {/* Last Check Banner — FIX 4 */}
+        {lastCheck && (
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20">
+            <ClipboardList className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-foreground mb-0.5">
+                Last completed eligibility check
+              </p>
+              <p className="text-xs font-mono text-primary truncate">{lastCheck.checkId}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Patient:{" "}
+                <span className="font-mono">{lastCheck.patient.slice(0, 10)}…{lastCheck.patient.slice(-4)}</span>
+                {" · "}Threshold: {lastCheck.threshold}
+                {" · "}{new Date(lastCheck.timestamp).toLocaleTimeString()}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs px-3 shrink-0"
+              onClick={() => {
+                setCheckId(lastCheck.checkId);
+                setClaimPatient(lastCheck.patient);
+              }}
+            >
+              Load
+            </Button>
           </div>
         )}
 
@@ -309,8 +367,14 @@ export default function InsuranceModule() {
                   placeholder="0x…"
                   value={claimPatient}
                   onChange={(e) => setClaimPatient(e.target.value)}
-                  className="font-mono text-xs"
+                  className={`font-mono text-xs ${patientMismatch ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
                 />
+                {patientMismatch && (
+                  <p className="mt-1.5 flex items-center gap-1 text-xs text-amber-500">
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    Address differs from the check origin — this claim may fail.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">
@@ -322,7 +386,6 @@ export default function InsuranceModule() {
                   onChange={(e) => setCheckId(e.target.value)}
                   className={`font-mono text-xs ${checkIdError ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
-                {/* Fix 4 — helper text + validation */}
                 {checkIdError ? (
                   <p className="mt-1.5 flex items-center gap-1 text-xs text-destructive">
                     <AlertTriangle className="h-3 w-3 shrink-0" />
@@ -333,7 +396,9 @@ export default function InsuranceModule() {
                     <Info className="h-3 w-3 shrink-0 mt-0.5" />
                     Paste the bytes32 Check ID from Provider Dashboard after running an
                     eligibility check. It is automatically copied to your clipboard when a
-                    check completes.
+                    check completes. Use the{" "}
+                    <strong className="text-foreground">Load</strong> button above if you just
+                    ran a check in this session.
                   </p>
                 )}
               </div>
@@ -432,7 +497,6 @@ export default function InsuranceModule() {
           ) : null}
         </div>
 
-        {/* Fix 3 — Transaction History */}
         <TxHistoryPanel entries={entries} onClear={clearHistory} />
       </div>
     </div>
