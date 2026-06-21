@@ -19,7 +19,7 @@ run = "pnpm --filter @workspace/mediflow-ui run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/mediflow-ui", "run", "build" ]
-publicDir = "artifacts/mediflow-ui/dist/public"
+publicDir = "artifacts/mediflow-ui/dist"
 serve = "static"
 
 [[services.production.rewrites]]
