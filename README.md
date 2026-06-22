@@ -1,6 +1,6 @@
 # MediFlow — Composable Confidential Health Records on Zama FHEVM
 
-> **Live demo:** [public-eta-lemon-42.vercel.app](https://public-eta-lemon-42.vercel.app)
+> **Live demo:** [public-eta-lemon-42.vercel.app](https://mediflow-mediflow-ui.vercel.app/)
 >
 > **⚠ All data is mock/synthetic — no real patient records. Research demo on Sepolia testnet.**
 
